@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String
+  role      Role      @default(USER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  teams     Team[]    @relation("TeamMembers")
+  ownTeams  Team[]    @relation("TeamOwner")
+  entries   Entry[]
+}
+
+model Competition {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String
+  type        CompType
+  startDate   DateTime
+  endDate     DateTime
+  location    String?
+  rules       String?
+  image       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  entries     Entry[]
+}
+
+model Team {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  ownerId     Int
+  owner       User      @relation("TeamOwner", fields: [ownerId], references: [id])
+  members     User[]    @relation("TeamMembers")
+  entries     Entry[]
+}
+
+model Entry {
+  id            Int         @id @default(autoincrement())
+  competitionId Int
+  userId        Int?
+  teamId        Int?
+  status        EntryStatus @default(PENDING)
+  score         Float?
+  feedback      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  competition   Competition @relation(fields: [competitionId], references: [id])
+  user          User?       @relation(fields: [userId], references: [id])
+  team          Team?       @relation(fields: [teamId], references: [id])
+}
+
+enum Role {
+  USER
+  ADMIN
+  ORGANIZER
+}
+
+enum CompType {
+  SPORTS
+  INTELLECTUAL
+  CREATIVE
+}
+
+enum EntryStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+} 
