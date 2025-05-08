@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import Navbar from '../../components/Navbar'
 import Footer from '../../components/Footer'
-import { FaUsers, FaTrophy, FaArrowLeft, FaEdit, FaTrash, FaPlus, FaUser, FaCalendarAlt, FaExclamationTriangle, FaUserPlus, FaDoorOpen, FaExclamationCircle, FaCheck } from 'react-icons/fa'
+import { FaUsers, FaTrophy, FaArrowLeft, FaEdit, FaTrash, FaPlus, FaUser, FaCalendarAlt, FaExclamationTriangle, FaUserPlus, FaDoorOpen, FaExclamationCircle, FaCheck, FaStar } from 'react-icons/fa'
 import { useAuth } from '../../context/AuthContext'
 
 export default function TeamDetailPage() {
@@ -642,7 +642,76 @@ export default function TeamDetailPage() {
           </div>
         </div>
       </main>
-      
+      {/* --- Team Statistics & Achievements --- */}
+      <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-8 container mx-auto px-4">
+        {/* Statistics */}
+        <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center">
+          <h3 className="text-xl font-bold mb-4 flex items-center"><FaTrophy className="mr-2 text-yellow-500" />Статистика команды</h3>
+          <div className="w-full space-y-3">
+            <div className="flex justify-between items-center">
+              <span>Побед:</span>
+              <span className="font-bold text-green-600">{team?.stats?.wins ?? 8}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>Поражений:</span>
+              <span className="font-bold text-red-500">{team?.stats?.losses ?? 3}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>Участий:</span>
+              <span className="font-bold text-blue-600">{team?.stats?.participations ?? 15}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>Процент побед:</span>
+              <span className="font-bold text-purple-600">{team?.stats ? Math.round((team.stats.wins/(team.stats.participations||1))*100) : 53}%</span>
+            </div>
+          </div>
+        </div>
+        {/* Participation History */}
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <h3 className="text-xl font-bold mb-4 flex items-center"><FaCalendarAlt className="mr-2 text-primary-500" />История участия</h3>
+          <ul className="divide-y divide-gray-100">
+            {(team?.history ?? [
+              { title: 'Турнир по мини-футболу', date: '2024-02-15', result: 'Победа', status: 'completed' },
+              { title: 'Весенний кубок', date: '2024-03-20', result: 'Поражение', status: 'completed' },
+              { title: 'Летний чемпионат', date: '2024-05-10', result: 'Участие', status: 'active' },
+            ]).map((item, idx) => (
+              <li key={idx} className="flex justify-between items-center py-2">
+                <div>
+                  <div className="font-medium">{item.title}</div>
+                  <div className="text-xs text-gray-500">{item.date}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${item.result === 'Победа' ? 'bg-green-100 text-green-700' : item.result === 'Поражение' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{item.result}</span>
+                  <span className={`px-2 py-0.5 rounded text-xs ${item.status === 'completed' ? 'bg-gray-200' : 'bg-yellow-100 text-yellow-700'}`}>{item.status === 'completed' ? 'Завершено' : 'В процессе'}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+        {/* Achievements */}
+        <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center">
+          <h3 className="text-xl font-bold mb-4 flex items-center"><FaStar className="mr-2 text-yellow-400" />Достижения</h3>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {/* Mock achievements */}
+            <div className="flex flex-col items-center">
+              <span className="text-3xl">🥇</span>
+              <span className="text-xs mt-1">Чемпионы сезона</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-3xl">🏅</span>
+              <span className="text-xs mt-1">Лучший дебют</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-3xl">🔥</span>
+              <span className="text-xs mt-1">Серия из 5 побед</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-3xl">🤝</span>
+              <span className="text-xs mt-1">Командный дух</span>
+            </div>
+          </div>
+        </div>
+      </div>
       <Footer />
       
       {showDeleteModal && <DeleteModal />}

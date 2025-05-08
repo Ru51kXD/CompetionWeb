@@ -1376,6 +1376,77 @@ export default function ProfilePage() {
         </div>
       )}
       
+      {/* --- User Statistics & Achievements --- */}
+      <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Statistics */}
+        <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center">
+          <h3 className="text-xl font-bold mb-4 flex items-center"><FaTrophy className="mr-2 text-yellow-500" />Статистика</h3>
+          <div className="w-full space-y-3">
+            <div className="flex justify-between items-center">
+              <span>Побед:</span>
+              <span className="font-bold text-green-600">{user?.stats?.wins ?? 5}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>Поражений:</span>
+              <span className="font-bold text-red-500">{user?.stats?.losses ?? 2}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>Участий:</span>
+              <span className="font-bold text-blue-600">{user?.stats?.participations ?? 9}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>Процент побед:</span>
+              <span className="font-bold text-purple-600">{user?.stats ? Math.round((user.stats.wins/(user.stats.participations||1))*100) : 56}%</span>
+            </div>
+          </div>
+        </div>
+        {/* Participation History */}
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <h3 className="text-xl font-bold mb-4 flex items-center"><FaCalendarAlt className="mr-2 text-primary-500" />История участия</h3>
+          <ul className="divide-y divide-gray-100">
+            {(user?.history ?? [
+              { title: 'Открытый турнир по шахматам', date: '2024-03-10', result: 'Победа', status: 'completed' },
+              { title: 'Весенний марафон', date: '2024-04-01', result: 'Участие', status: 'active' },
+              { title: 'Летний кубок', date: '2024-05-20', result: 'Поражение', status: 'completed' },
+            ]).map((item, idx) => (
+              <li key={idx} className="flex justify-between items-center py-2">
+                <div>
+                  <div className="font-medium">{item.title}</div>
+                  <div className="text-xs text-gray-500">{item.date}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${item.result === 'Победа' ? 'bg-green-100 text-green-700' : item.result === 'Поражение' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{item.result}</span>
+                  <span className={`px-2 py-0.5 rounded text-xs ${item.status === 'completed' ? 'bg-gray-200' : 'bg-yellow-100 text-yellow-700'}`}>{item.status === 'completed' ? 'Завершено' : 'В процессе'}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+        {/* Achievements */}
+        <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center">
+          <h3 className="text-xl font-bold mb-4 flex items-center"><FaStar className="mr-2 text-yellow-400" />Достижения</h3>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {/* Mock achievements */}
+            <div className="flex flex-col items-center">
+              <span className="text-3xl">🏆</span>
+              <span className="text-xs mt-1">Победитель турнира</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-3xl">🥈</span>
+              <span className="text-xs mt-1">Серебряный призёр</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-3xl">🔥</span>
+              <span className="text-xs mt-1">Серия из 3 побед</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-3xl">🎯</span>
+              <span className="text-xs mt-1">100% посещаемость</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <Footer />
     </div>
   )

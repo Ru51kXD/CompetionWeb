@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Calendar,
@@ -23,198 +23,353 @@ import {
   FaTrash
 } from 'react-icons/fa';
 import useSocket from '../hooks/useSocket';
+import { toast } from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 // Настраиваем локализацию для календаря
 moment.locale('ru');
 const localizer = momentLocalizer(moment);
 
+// Выносим константы за пределы компонента
+const TIME_SLOTS = {
+  MORNING: { start: 9, end: 12 },
+  AFTERNOON: { start: 13, end: 17 }
+};
+
+const EVENT_TYPES = {
+  MATCH: 'match',
+  INDIVIDUAL: 'individual',
+  CEREMONY: 'ceremony'
+};
+
+const EVENT_COLORS = {
+  [EVENT_TYPES.MATCH]: '#3b82f6',
+  [EVENT_TYPES.INDIVIDUAL]: '#10b981',
+  [EVENT_TYPES.CEREMONY]: '#4338ca'
+};
+
 export default function ScheduleGenerator({ competition, participants, rooms, initialEvents = [] }) {
   const [events, setEvents] = useState(initialEvents);
   const [generatedEvents, setGeneratedEvents] = useState([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [generationStatus, setGenerationStatus] = useState('idle'); // 'idle', 'loading', 'success', 'error'
+  const [generationStatus, setGenerationStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [scheduleVersion, setScheduleVersion] = useState(1);
   const { sendNotification } = useSocket();
+  const { user } = useAuth();
 
-  // Форматирование событий для календаря
-  const formattedEvents = events.map(event => ({
-    ...event,
-    start: new Date(event.start),
-    end: new Date(event.end)
-  }));
+  // Мемоизируем форматированные события
+  const formattedEvents = useMemo(() => 
+    events.map(event => ({
+      ...event,
+      start: new Date(event.start),
+      end: new Date(event.end)
+    })), [events]);
 
-  // Генерируем расписание соревнований на основе данных
-  const generateSchedule = () => {
+  // Мемоизируем функцию стилизации событий
+  const eventStyleGetter = useCallback((event) => {
+    const backgroundColor = event.color || EVENT_COLORS[event.type] || '#6366f1';
+    
+    return {
+      style: {
+        backgroundColor,
+        borderRadius: '5px',
+        opacity: 0.95,
+        color: 'white',
+        border: '0',
+        display: 'block'
+      }
+    };
+  }, []);
+
+  // Оптимизированная генерация временных слотов
+  const generateTimeSlots = useCallback((startDate, endDate) => {
+    const timeSlots = [];
+    const dayDiff = Math.floor((endDate - startDate) / (24 * 60 * 60 * 1000)) + 1;
+    
+    for (let day = 0; day < dayDiff; day++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(currentDate.getDate() + day);
+      
+      // Генерируем утренние слоты
+      for (let hour = TIME_SLOTS.MORNING.start; hour < TIME_SLOTS.MORNING.end; hour++) {
+        timeSlots.push(createTimeSlot(currentDate, hour, 'morning'));
+      }
+      
+      // Генерируем дневные слоты
+      for (let hour = TIME_SLOTS.AFTERNOON.start; hour < TIME_SLOTS.AFTERNOON.end; hour++) {
+        timeSlots.push(createTimeSlot(currentDate, hour, 'afternoon'));
+      }
+    }
+    
+    return timeSlots;
+  }, []);
+
+  // Вспомогательная функция создания временного слота
+  const createTimeSlot = (date, hour, preference) => ({
+    start: new Date(date.setHours(hour, 0, 0)),
+    end: new Date(date.setHours(hour + 1, 0, 0)),
+    available: true,
+    preference
+  });
+
+  // Оптимизированная генерация расписания
+  const generateSchedule = useCallback(() => {
     setGenerationStatus('loading');
     setErrorMessage('');
     
     try {
-      // Проверяем данные участников и помещений
-      if (!participants || participants.length < 2) {
-        throw new Error('Недостаточно участников для генерации расписания');
-      }
+      validateScheduleData(participants, rooms, competition);
       
-      if (!rooms || rooms.length === 0) {
-        throw new Error('Необходимо добавить хотя бы одно помещение для проведения соревнований');
-      }
-      
-      if (!competition || !competition.startDate || !competition.endDate) {
-        throw new Error('Не указаны даты начала и окончания соревнования');
-      }
-      
-      // Получаем даты начала и окончания соревнования
       const startDate = new Date(competition.startDate);
       const endDate = new Date(competition.endDate);
       
-      // Рассчитываем количество дней соревнования
-      const dayDiff = Math.floor((endDate - startDate) / (24 * 60 * 60 * 1000)) + 1;
+      const timeSlots = generateTimeSlots(startDate, endDate);
+      const matchSchedule = generateMatchSchedule(participants, timeSlots, rooms);
+      const ceremonies = generateCeremonies(startDate, endDate, rooms[0], participants);
       
-      if (dayDiff < 1) {
-        throw new Error('Дата окончания должна быть позже даты начала соревнования');
-      }
-      
-      // Расчет доступных слотов времени (с 9:00 до 18:00 каждый день)
-      const timeSlots = [];
-      for (let day = 0; day < dayDiff; day++) {
-        const currentDate = new Date(startDate);
-        currentDate.setDate(currentDate.getDate() + day);
-        
-        for (let hour = 9; hour < 18; hour++) {
-          const slotStart = new Date(currentDate);
-          slotStart.setHours(hour, 0, 0);
-          
-          const slotEnd = new Date(currentDate);
-          slotEnd.setHours(hour + 1, 0, 0);
-          
-          timeSlots.push({
-            start: slotStart,
-            end: slotEnd,
-            available: true
-          });
-        }
-      }
-      
-      // Имитация генерации расписания соревнований
-      const newEvents = [];
-      
-      // Если это командное соревнование, создаем матчи между командами
-      if (competition.type === 'team') {
-        // Генерация матчей (алгоритм "каждый с каждым")
-        for (let i = 0; i < participants.length; i++) {
-          for (let j = i + 1; j < participants.length; j++) {
-            // Находим доступный слот и помещение
-            const availableSlotIndex = timeSlots.findIndex(slot => slot.available);
-            
-            if (availableSlotIndex === -1) {
-              throw new Error('Недостаточно временных слотов для всех матчей');
-            }
-            
-            const slot = timeSlots[availableSlotIndex];
-            const room = rooms[Math.floor(Math.random() * rooms.length)];
-            
-            // Создаем новое событие (матч)
-            const event = {
-              id: uuidv4(),
-              title: `${participants[i].name} vs ${participants[j].name}`,
-              start: slot.start,
-              end: slot.end,
-              resource: room.id,
-              location: room.name,
-              participants: [participants[i].id, participants[j].id],
-              type: 'match'
-            };
-            
-            newEvents.push(event);
-            
-            // Отмечаем слот как занятый
-            timeSlots[availableSlotIndex].available = false;
-          }
-        }
-      } else {
-        // Индивидуальное соревнование - создаем события для каждого участника
-        // Например, время презентации или выступления
-        
-        for (const participant of participants) {
-          // Находим доступный слот и помещение
-          const availableSlotIndex = timeSlots.findIndex(slot => slot.available);
-          
-          if (availableSlotIndex === -1) {
-            throw new Error('Недостаточно временных слотов для всех участников');
-          }
-          
-          const slot = timeSlots[availableSlotIndex];
-          const room = rooms[Math.floor(Math.random() * rooms.length)];
-          
-          // Создаем новое событие
-          const event = {
-            id: uuidv4(),
-            title: `Выступление: ${participant.name}`,
-            start: slot.start,
-            end: slot.end,
-            resource: room.id,
-            location: room.name,
-            participants: [participant.id],
-            type: 'individual'
-          };
-          
-          newEvents.push(event);
-          
-          // Отмечаем слот как занятый
-          timeSlots[availableSlotIndex].available = false;
-        }
-      }
-      
-      // Добавляем церемонии открытия и закрытия
-      newEvents.push({
-        id: uuidv4(),
-        title: 'Церемония открытия',
-        start: new Date(startDate.setHours(9, 0, 0)),
-        end: new Date(startDate.setHours(10, 0, 0)),
-        resource: rooms[0].id,
-        location: rooms[0].name,
-        participants: participants.map(p => p.id),
-        type: 'ceremony',
-        color: '#4338ca'
-      });
-      
-      // Церемония закрытия в последний день
-      const closingDate = new Date(endDate);
-      newEvents.push({
-        id: uuidv4(),
-        title: 'Церемония закрытия и награждение',
-        start: new Date(closingDate.setHours(16, 0, 0)),
-        end: new Date(closingDate.setHours(18, 0, 0)),
-        resource: rooms[0].id,
-        location: rooms[0].name,
-        participants: participants.map(p => p.id),
-        type: 'ceremony',
-        color: '#4338ca'
-      });
-      
-      // Имитируем задержку для отображения загрузки
-      setTimeout(() => {
+      const newEvents = [...matchSchedule, ...ceremonies];
+
+      // Используем requestAnimationFrame для оптимизации рендеринга
+      requestAnimationFrame(() => {
         setGeneratedEvents(newEvents);
         setShowConfirmation(true);
         setGenerationStatus('success');
-      }, 1500);
+      });
       
     } catch (error) {
       setErrorMessage(error.message);
       setGenerationStatus('error');
+      toast.error(error.message);
+    }
+  }, [competition, participants, rooms, generateTimeSlots]);
+
+  // Валидация данных расписания
+  const validateScheduleData = (participants, rooms, competition) => {
+    if (!participants || participants.length < 2) {
+      throw new Error('Недостаточно участников для генерации расписания');
+    }
+    
+    if (!rooms || rooms.length === 0) {
+      throw new Error('Необходимо добавить хотя бы одно помещение для проведения соревнований');
+    }
+    
+    if (!competition?.startDate || !competition?.endDate) {
+      throw new Error('Не указаны даты начала и окончания соревнования');
+    }
+    
+    const startDate = new Date(competition.startDate);
+    const endDate = new Date(competition.endDate);
+    
+    if (endDate <= startDate) {
+      throw new Error('Дата окончания должна быть позже даты начала соревнования');
     }
   };
-  
-  // Подтверждает и сохраняет сгенерированное расписание
+
+  // Оптимизированная модификация расписания
+  const modifySchedule = useCallback((eventId, newStart, newEnd, newRoom) => {
+    setEvents(prevEvents => {
+      const updatedEvents = prevEvents.map(event => {
+        if (event.id === eventId) {
+          const updatedEvent = {
+            ...event,
+            start: newStart,
+            end: newEnd,
+            resource: newRoom.id,
+            location: newRoom.name,
+            version: scheduleVersion + 1
+          };
+          
+          // Отправляем уведомления асинхронно
+          if (sendNotification) {
+            event.participants.forEach(participantId => {
+              setTimeout(() => {
+                sendNotification(
+                  'warning',
+                  participantId,
+                  `Изменение в расписании: "${event.title}" перенесен на ${new Date(newStart).toLocaleString()} в ${newRoom.name}`
+                );
+              }, 0);
+            });
+          }
+          
+          return updatedEvent;
+        }
+        return event;
+      });
+      
+      setScheduleVersion(prev => prev + 1);
+      toast.success('Расписание обновлено');
+      
+      return updatedEvents;
+    });
+  }, [sendNotification, scheduleVersion]);
+
+  // Мемоизированные сообщения для календаря
+  const calendarMessages = useMemo(() => ({
+    allDay: 'Весь день',
+    previous: 'Назад',
+    next: 'Вперед',
+    today: 'Сегодня',
+    month: 'Месяц',
+    week: 'Неделя',
+    day: 'День',
+    agenda: 'Список',
+    date: 'Дата',
+    time: 'Время',
+    event: 'Событие',
+    noEventsInRange: 'Нет событий в этом диапазоне.'
+  }), []);
+
+  // Генерация расписания матчей с оптимизацией
+  const generateMatchSchedule = (participants, timeSlots, rooms) => {
+    const matches = [];
+    const participantPreferences = new Map();
+    
+    // Собираем предпочтения участников
+    participants.forEach(participant => {
+      participantPreferences.set(participant.id, {
+        preferredTime: Math.random() > 0.5 ? 'morning' : 'afternoon',
+        matchesPlayed: 0
+      });
+    });
+    
+    // Создаем пары матчей
+    for (let i = 0; i < participants.length; i++) {
+      for (let j = i + 1; j < participants.length; j++) {
+        const team1 = participants[i];
+        const team2 = participants[j];
+        
+        // Находим оптимальный слот с учетом предпочтений
+        const optimalSlot = findOptimalTimeSlot(
+          timeSlots,
+          participantPreferences.get(team1.id),
+          participantPreferences.get(team2.id)
+        );
+        
+        if (!optimalSlot) {
+          throw new Error('Не удалось найти подходящее время для всех матчей');
+        }
+        
+        // Выбираем оптимальное помещение
+        const room = findOptimalRoom(rooms, optimalSlot.start);
+        
+        // Создаем матч
+        const match = {
+          id: uuidv4(),
+          title: `${team1.name} vs ${team2.name}`,
+          start: optimalSlot.start,
+          end: optimalSlot.end,
+          resource: room.id,
+          location: room.name,
+          participants: [team1.id, team2.id],
+          type: 'match',
+          version: scheduleVersion
+        };
+        
+        matches.push(match);
+        
+        // Обновляем статистику
+        participantPreferences.get(team1.id).matchesPlayed++;
+        participantPreferences.get(team2.id).matchesPlayed++;
+        optimalSlot.available = false;
+      }
+    }
+    
+    return matches;
+  };
+
+  // Поиск оптимального временного слота
+  const findOptimalTimeSlot = (timeSlots, team1Pref, team2Pref) => {
+    // Сначала ищем слот, который подходит обоим командам
+    let slot = timeSlots.find(slot => 
+      slot.available && 
+      slot.preference === team1Pref.preferredTime &&
+      slot.preference === team2Pref.preferredTime
+    );
+    
+    // Если не нашли, ищем любой доступный слот
+    if (!slot) {
+      slot = timeSlots.find(slot => slot.available);
+    }
+    
+    return slot;
+  };
+
+  // Поиск оптимального помещения
+  const findOptimalRoom = (rooms, time) => {
+    // Проверяем загруженность помещений
+    const roomLoad = rooms.map(room => ({
+      room,
+      load: events.filter(e => e.resource === room.id && 
+        new Date(e.start).toDateString() === time.toDateString()).length
+    }));
+    
+    // Выбираем наименее загруженное помещение
+    return roomLoad.sort((a, b) => a.load - b.load)[0].room;
+  };
+
+  // Генерация церемоний
+  const generateCeremonies = (startDate, endDate, mainRoom, participants) => {
+    return [
+      {
+        id: uuidv4(),
+        title: 'Церемония открытия',
+        start: new Date(startDate.setHours(9, 0, 0)),
+        end: new Date(startDate.setHours(10, 0, 0)),
+        resource: mainRoom.id,
+        location: mainRoom.name,
+        participants: participants.map(p => p.id),
+        type: 'ceremony',
+        color: '#4338ca',
+        version: scheduleVersion
+      },
+      {
+        id: uuidv4(),
+        title: 'Церемония закрытия и награждение',
+        start: new Date(endDate.setHours(16, 0, 0)),
+        end: new Date(endDate.setHours(18, 0, 0)),
+        resource: mainRoom.id,
+        location: mainRoom.name,
+        participants: participants.map(p => p.id),
+        type: 'ceremony',
+        color: '#4338ca',
+        version: scheduleVersion
+      }
+    ];
+  };
+
+  // Подтверждение и сохранение расписания
   const confirmSchedule = () => {
     setEvents(generatedEvents);
     setShowConfirmation(false);
+    setScheduleVersion(prev => prev + 1);
     
-    // Отправляем уведомление всем участникам о создании расписания
+    // Отправляем уведомления участникам
     if (sendNotification) {
+      // Уведомление о создании расписания
       sendNotification('info', 'all', `Расписание для "${competition?.name}" создано и доступно для просмотра.`);
+      
+      // Отправляем персональные уведомления участникам
+      generatedEvents.forEach(event => {
+        if (event.type === 'match') {
+          event.participants.forEach(participantId => {
+            const participant = participants.find(p => p.id === participantId);
+            if (participant) {
+              sendNotification(
+                'info',
+                participantId,
+                `Ваш матч "${event.title}" запланирован на ${new Date(event.start).toLocaleString()} в ${event.location}`
+              );
+            }
+          });
+        }
+      });
     }
+    
+    toast.success('Расписание успешно создано');
   };
-  
+
   // Отменяет сгенерированное расписание
   const cancelGeneration = () => {
     setGeneratedEvents([]);
@@ -227,32 +382,6 @@ export default function ScheduleGenerator({ competition, participants, rooms, in
     if (confirm('Вы уверены, что хотите удалить все события из расписания?')) {
       setEvents([]);
     }
-  };
-  
-  // Функция для определения стиля события
-  const eventStyleGetter = (event) => {
-    let backgroundColor = '#6366f1';
-    
-    if (event.color) {
-      backgroundColor = event.color;
-    } else if (event.type === 'match') {
-      backgroundColor = '#3b82f6';
-    } else if (event.type === 'individual') {
-      backgroundColor = '#10b981';
-    } else if (event.type === 'ceremony') {
-      backgroundColor = '#4338ca';
-    }
-    
-    return {
-      style: {
-        backgroundColor,
-        borderRadius: '5px',
-        opacity: 0.95,
-        color: 'white',
-        border: '0',
-        display: 'block'
-      }
-    };
   };
   
   return (
@@ -398,20 +527,7 @@ export default function ScheduleGenerator({ competition, participants, rooms, in
           timeslots={1}
           min={new Date(0, 0, 0, 8, 0)}
           max={new Date(0, 0, 0, 20, 0)}
-          messages={{
-            allDay: 'Весь день',
-            previous: 'Назад',
-            next: 'Вперед',
-            today: 'Сегодня',
-            month: 'Месяц',
-            week: 'Неделя',
-            day: 'День',
-            agenda: 'Список',
-            date: 'Дата',
-            time: 'Время',
-            event: 'Событие',
-            noEventsInRange: 'Нет событий в этом диапазоне.'
-          }}
+          messages={calendarMessages}
         />
       </div>
       

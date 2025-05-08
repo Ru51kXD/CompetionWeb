@@ -1,1 +1,40 @@
-{}
+{
+  "app\\dashboard\\page.jsx -> ../components/ActivityChart": {
+    "id": "app\\dashboard\\page.jsx -> ../components/ActivityChart",
+    "files": [
+      "static/chunks/_app-pages-browser_app_components_ActivityChart_tsx.js"
+    ]
+  },
+  "app\\dashboard\\page.jsx -> ../components/CompetitionsMap": {
+    "id": "app\\dashboard\\page.jsx -> ../components/CompetitionsMap",
+    "files": [
+      "static/css/_app-pages-browser_app_components_CompetitionsMap_jsx.css",
+      "static/chunks/_app-pages-browser_app_components_CompetitionsMap_jsx.js"
+    ]
+  },
+  "app\\dashboard\\page.jsx -> ../components/LeaderboardRealtime": {
+    "id": "app\\dashboard\\page.jsx -> ../components/LeaderboardRealtime",
+    "files": [
+      "static/chunks/_app-pages-browser_app_components_LeaderboardRealtime_jsx.js"
+    ]
+  },
+  "app\\dashboard\\page.jsx -> ../components/NotificationSystem": {
+    "id": "app\\dashboard\\page.jsx -> ../components/NotificationSystem",
+    "files": [
+      "static/chunks/_app-pages-browser_app_components_NotificationSystem_jsx.js"
+    ]
+  },
+  "app\\dashboard\\page.jsx -> ../components/ScheduleGenerator": {
+    "id": "app\\dashboard\\page.jsx -> ../components/ScheduleGenerator",
+    "files": [
+      "static/css/_app-pages-browser_app_components_ScheduleGenerator_jsx.css",
+      "static/chunks/_app-pages-browser_app_components_ScheduleGenerator_jsx.js"
+    ]
+  },
+  "app\\dashboard\\page.jsx -> ../components/TeamChat": {
+    "id": "app\\dashboard\\page.jsx -> ../components/TeamChat",
+    "files": [
+      "static/chunks/_app-pages-browser_app_components_TeamChat_jsx.js"
+    ]
+  }
+}

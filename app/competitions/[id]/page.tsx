@@ -63,6 +63,9 @@ interface Competition {
   prizePool?: number;
   entryFee?: number;
   paidTeams?: number[];
+  refundedTeams?: number[];
+  paymentLog?: { teamId: number; amount: number; status: 'paid' | 'refunded'; date: string }[];
+  prizeDistribution?: { teamId: number; amount: number }[];
 }
 
 interface PaymentCard {
@@ -580,7 +583,8 @@ export default function CompetitionDetailPage() {
                 maxTeamSize: 10,
                 status: 'upcoming',
                 startDate: safelyConvertDateToString(mockCompetition.startDate),
-                endDate: safelyConvertDateToString(mockCompetition.endDate)
+                endDate: safelyConvertDateToString(mockCompetition.endDate),
+                participants: Array.isArray(mockCompetition.participants) ? mockCompetition.participants : [],
               }
               setCompetition(mockWithCoordinates)
               setError('') // Сбросим ошибку, так как нашли соревнование в мок-данных
@@ -606,7 +610,8 @@ export default function CompetitionDetailPage() {
               maxTeamSize: 10,
               status: 'upcoming' as 'upcoming',
               startDate: safelyConvertDateToString(comp.startDate),
-              endDate: safelyConvertDateToString(comp.endDate)
+              endDate: safelyConvertDateToString(comp.endDate),
+              participants: Array.isArray(comp.participants) ? comp.participants : [],
             }
           })
           localStorage.setItem('competitions', JSON.stringify(competitionsWithCoordinates))
@@ -856,6 +861,55 @@ export default function CompetitionDetailPage() {
         {label}
       </div>
     );
+  };
+
+  // Handler for refund
+  const handleRefund = (teamId: number) => {
+    if (!competition) return;
+    const updatedCompetition = { ...competition };
+    if (!updatedCompetition.refundedTeams) updatedCompetition.refundedTeams = [];
+    if (!updatedCompetition.paymentLog) updatedCompetition.paymentLog = [];
+    updatedCompetition.refundedTeams.push(teamId);
+    updatedCompetition.paymentLog.push({
+      teamId,
+      amount: competition.entryFee || 0,
+      status: 'refunded',
+      date: new Date().toISOString(),
+    });
+    // Remove from paidTeams
+    updatedCompetition.paidTeams = updatedCompetition.paidTeams?.filter(id => id !== teamId);
+    setCompetition(updatedCompetition);
+    // Save to localStorage
+    const storedCompetitions = localStorage.getItem('competitions');
+    if (storedCompetitions) {
+      const allCompetitions = JSON.parse(storedCompetitions);
+      const idx = allCompetitions.findIndex((c: any) => c.id === competition.id);
+      if (idx !== -1) {
+        allCompetitions[idx] = updatedCompetition;
+        localStorage.setItem('competitions', JSON.stringify(allCompetitions));
+      }
+    }
+  };
+
+  // Handler for prize pool distribution
+  const handleDistributePrizePool = () => {
+    if (!competition || !competition.paidTeams || !competition.prizePool) return;
+    // Simple distribution: all paid teams share the prize equally
+    const winners = competition.paidTeams;
+    const prizePerTeam = Math.floor(competition.prizePool / winners.length);
+    const distribution = winners.map(teamId => ({ teamId, amount: prizePerTeam }));
+    const updatedCompetition = { ...competition, prizeDistribution: distribution };
+    setCompetition(updatedCompetition);
+    // Save to localStorage
+    const storedCompetitions = localStorage.getItem('competitions');
+    if (storedCompetitions) {
+      const allCompetitions = JSON.parse(storedCompetitions);
+      const idx = allCompetitions.findIndex((c: any) => c.id === competition.id);
+      if (idx !== -1) {
+        allCompetitions[idx] = updatedCompetition;
+        localStorage.setItem('competitions', JSON.stringify(allCompetitions));
+      }
+    }
   };
 
   if (loading) {
@@ -1518,7 +1572,7 @@ export default function CompetitionDetailPage() {
               <button
                 className="btn-primary py-2 px-4"
                 onClick={() => {
-                  // Add more logging to debug
+                  // Add logging for debugging
                   console.log("Processing payment with saved card:", savedCard);
                   console.log("Using saved card:", useSavedCard);
                   
@@ -1607,7 +1661,75 @@ export default function CompetitionDetailPage() {
         </div>
       )}
       
+      {isAdmin() && competition && (
+        <div className="my-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
+          <h2 className="text-2xl font-bold mb-4 flex items-center">
+            <FaCreditCard className="mr-2 text-primary-600" /> Управление взносами и возвратами
+          </h2>
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-2">Оплаченные команды</h3>
+            {competition.paidTeams && competition.paidTeams.length > 0 ? (
+              <ul className="divide-y divide-gray-200">
+                {competition.paidTeams.map(teamId => {
+                  const team = allTeams.find(t => t.id === teamId);
+                  const isRefunded = competition.refundedTeams?.includes(teamId);
+                  return (
+                    <li key={teamId} className="flex items-center justify-between py-3">
+                      <div>
+                        <span className="font-medium">{team?.name || `Команда #${teamId}`}</span>
+                        {isRefunded && (
+                          <span className="ml-2 px-2 py-0.5 text-xs rounded bg-red-100 text-red-700">Возврат</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-yellow-700 font-semibold">{competition.entryFee?.toLocaleString()} ₸</span>
+                        {!isRefunded && (
+                          <button
+                            className="btn-outline btn-xs"
+                            onClick={() => handleRefund(teamId)}
+                          >
+                            Оформить возврат
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-gray-600">Нет оплаченных команд</p>
+            )}
+          </div>
+          {competition.status === 'completed' && competition.prizePool && competition.prizePool > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-2">Распределение призового фонда</h3>
+              <button
+                className="btn-primary mb-3"
+                onClick={handleDistributePrizePool}
+              >
+                Распределить призовой фонд
+              </button>
+              {competition.prizeDistribution && competition.prizeDistribution.length > 0 && (
+                <ul className="divide-y divide-gray-200">
+                  {competition.prizeDistribution.map(prize => {
+                    const team = allTeams.find(t => t.id === prize.teamId);
+                    return (
+                      <li key={prize.teamId} className="flex items-center justify-between py-2">
+                        <span>{team?.name || `Команда #${prize.teamId}`}</span>
+                        <span className="font-bold text-green-700">{prize.amount.toLocaleString()} ₸</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      
       <Footer />
     </div>
   )
-} 
+}
+
+// ... existing code ...
