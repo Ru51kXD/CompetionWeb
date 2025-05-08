@@ -171,10 +171,7 @@ const AdminRequests: React.FC = () => {
 
   return (
     <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-2">Заявки на вступление</h1>
-        <p className="text-gray-600">Управление заявками на вступление в команды</p>
-      </div>
+      <h1 className="text-2xl font-bold mb-4">Управление заявками</h1>
 
       <Card>
         <Table

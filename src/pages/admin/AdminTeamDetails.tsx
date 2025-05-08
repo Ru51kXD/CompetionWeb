@@ -23,8 +23,69 @@ const AdminTeamDetails: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
 
+  // Добавляем функцию инициализации данных, если команда не найдена
+  const initializeTeamData = () => {
+    try {
+      // Создаем тестовую команду с ID 19, если она запрашивается и не существует
+      if (teamId === '19' && !mockTeams.find(t => t.id === 19)) {
+        const newTeam: Team = {
+          id: 19,
+          name: 'Тестовая команда 19',
+          description: 'Команда для тестирования, созданная автоматически',
+          type: 'Спортивные',
+          maxParticipants: 10,
+          participants: [
+            {
+              id: 1001,
+              name: 'Алексей Тестов',
+              email: 'test@example.com',
+              role: 'Капитан'
+            }
+          ],
+          competitions: [
+            {
+              id: 101,
+              name: 'Тестовое соревнование',
+              type: 'Спортивные',
+              status: 'Активно'
+            }
+          ],
+          createdAt: new Date().toISOString(),
+        };
+        
+        // Сохраняем тестовую команду в localStorage
+        const storedTeams = localStorage.getItem('teams');
+        let teams = storedTeams ? JSON.parse(storedTeams) : [];
+        teams = teams.filter((t: Team) => t.id !== 19);
+        teams.push(newTeam);
+        localStorage.setItem('teams', JSON.stringify(teams));
+        
+        // Создаем тестовые заявки
+        const mockRequests: JoinRequest[] = [
+          {
+            id: 1,
+            userId: 101,
+            userName: 'Иван Петров',
+            userEmail: 'ivan@example.com',
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            message: 'Хочу присоединиться к команде 19'
+          }
+        ];
+        localStorage.setItem(`team_19_requests`, JSON.stringify(mockRequests));
+        
+        console.log('Создана тестовая команда с ID 19');
+        return newTeam;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error initializing test team:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
-    const fetchTeamAndRequests = () => {
+    const fetchTeamAndRequests = async () => {
       try {
         console.log('Fetching team with ID:', teamId);
         
@@ -41,44 +102,49 @@ const AdminTeamDetails: React.FC = () => {
         }
 
         // Ищем команду
-        const foundTeam = teams.find(t => t.id === Number(teamId));
+        let foundTeam = teams.find(t => t.id === Number(teamId));
         console.log('Found team:', foundTeam);
 
-        if (foundTeam) {
-          setTeam(foundTeam);
-          
-          // Загружаем заявки
-          const storedRequests = localStorage.getItem(`team_${teamId}_requests`);
-          if (storedRequests) {
-            setJoinRequests(JSON.parse(storedRequests));
-          } else {
-            // Создаем тестовые заявки
-            const mockRequests: JoinRequest[] = [
-              {
-                id: 1,
-                userId: 101,
-                userName: 'Иван Петров',
-                userEmail: 'ivan@example.com',
-                status: 'pending',
-                createdAt: new Date().toISOString(),
-                message: 'Хочу присоединиться к команде'
-              },
-              {
-                id: 2,
-                userId: 102,
-                userName: 'Мария Сидорова',
-                userEmail: 'maria@example.com',
-                status: 'pending',
-                createdAt: new Date().toISOString(),
-                message: 'Имею опыт участия в подобных соревнованиях'
-              }
-            ];
-            setJoinRequests(mockRequests);
-            localStorage.setItem(`team_${teamId}_requests`, JSON.stringify(mockRequests));
+        // Если команда не найдена, пробуем инициализировать тестовые данные
+        if (!foundTeam) {
+          foundTeam = initializeTeamData();
+          if (!foundTeam) {
+            message.error('Команда не найдена');
+            navigate('/admin/teams');
+            return;
           }
+        }
+
+        setTeam(foundTeam);
+        
+        // Загружаем заявки
+        const storedRequests = localStorage.getItem(`team_${teamId}_requests`);
+        if (storedRequests) {
+          setJoinRequests(JSON.parse(storedRequests));
         } else {
-          message.error('Команда не найдена');
-          navigate('/admin/teams');
+          // Создаем тестовые заявки
+          const mockRequests: JoinRequest[] = [
+            {
+              id: 1,
+              userId: 101,
+              userName: 'Иван Петров',
+              userEmail: 'ivan@example.com',
+              status: 'pending',
+              createdAt: new Date().toISOString(),
+              message: 'Хочу присоединиться к команде'
+            },
+            {
+              id: 2,
+              userId: 102,
+              userName: 'Мария Сидорова',
+              userEmail: 'maria@example.com',
+              status: 'pending',
+              createdAt: new Date().toISOString(),
+              message: 'Имею опыт участия в подобных соревнованиях'
+            }
+          ];
+          setJoinRequests(mockRequests);
+          localStorage.setItem(`team_${teamId}_requests`, JSON.stringify(mockRequests));
         }
       } catch (error) {
         console.error('Error fetching data:', error);

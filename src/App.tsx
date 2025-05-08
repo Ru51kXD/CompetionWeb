@@ -39,8 +39,8 @@ function App() {
             <Route path="/admin/teams" element={<AdminTeams />} />
             <Route path="/admin/teams/:teamId" element={<AdminTeamDetails />} />
             <Route path="/admin/competitions" element={<AdminCompetitions />} />
-            <Route path="/admin/competitions/:competitionId" element={<AdminCompetitionDetails />} />
             <Route path="/admin/competitions/create" element={<AdminCompetitionCreate />} />
+            <Route path="/admin/competitions/:competitionId" element={<AdminCompetitionDetails />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/requests" element={<AdminRequests />} />
           </Routes>

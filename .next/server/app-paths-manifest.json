@@ -1,5 +1,10 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
   "/page": "app/page.js",
-  "/admin/page": "app/admin/page.js"
+  "/admin/page": "app/admin/page.js",
+  "/admin/teams/page": "app/admin/teams/page.js",
+  "/admin/teams/[id]/page": "app/admin/teams/[id]/page.js",
+  "/admin/users/page": "app/admin/users/page.js",
+  "/admin/users/[id]/edit/page": "app/admin/users/[id]/edit/page.js",
+  "/admin/messages/page": "app/admin/messages/page.js",
+  "/admin/competitions/page": "app/admin/competitions/page.js"
 }

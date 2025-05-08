@@ -21,12 +21,44 @@ const AdminTeams: React.FC = () => {
         // Очищаем localStorage для команд
         localStorage.removeItem('teams');
         
-        // Сохраняем mock-данные
-        localStorage.setItem('teams', JSON.stringify(mockTeams));
-        setTeams(mockTeams);
+        // Проверяем, есть ли команда с ID 19, если нет - добавляем её в mock-данные
+        let teamsToSave = [...mockTeams];
+        
+        if (!teamsToSave.find(t => t.id === 19)) {
+          console.log('Создаем тестовую команду с ID 19');
+          const testTeam: Team = {
+            id: 19,
+            name: 'Тестовая команда 19',
+            description: 'Команда для тестирования, созданная автоматически',
+            type: 'Спортивные',
+            maxParticipants: 10,
+            participants: [
+              {
+                id: 1001,
+                name: 'Алексей Тестов',
+                email: 'test@example.com',
+                role: 'Капитан'
+              }
+            ],
+            competitions: [
+              {
+                id: 101,
+                name: 'Тестовое соревнование',
+                type: 'Спортивные',
+                status: 'Активно'
+              }
+            ],
+            createdAt: new Date().toISOString(),
+          };
+          teamsToSave.push(testTeam);
+        }
+        
+        // Сохраняем mock-данные с учетом команды с ID 19
+        localStorage.setItem('teams', JSON.stringify(teamsToSave));
+        setTeams(teamsToSave);
         
         // Инициализируем заявки для каждой команды
-        mockTeams.forEach(team => {
+        teamsToSave.forEach(team => {
           const mockRequests = [
             {
               id: 1,
@@ -62,7 +94,61 @@ const AdminTeams: React.FC = () => {
     if (!storedTeams) {
       initializeData();
     } else {
-      setTeams(JSON.parse(storedTeams));
+      try {
+        const parsedTeams = JSON.parse(storedTeams);
+        
+        // Проверяем, есть ли команда с ID 19
+        if (!parsedTeams.find((t: Team) => t.id === 19)) {
+          // Если нет, добавляем её
+          const testTeam: Team = {
+            id: 19,
+            name: 'Тестовая команда 19',
+            description: 'Команда для тестирования, созданная автоматически',
+            type: 'Спортивные',
+            maxParticipants: 10,
+            participants: [
+              {
+                id: 1001,
+                name: 'Алексей Тестов',
+                email: 'test@example.com',
+                role: 'Капитан'
+              }
+            ],
+            competitions: [
+              {
+                id: 101,
+                name: 'Тестовое соревнование',
+                type: 'Спортивные',
+                status: 'Активно'
+              }
+            ],
+            createdAt: new Date().toISOString(),
+          };
+          
+          const updatedTeams = [...parsedTeams, testTeam];
+          localStorage.setItem('teams', JSON.stringify(updatedTeams));
+          setTeams(updatedTeams);
+          
+          // Создаем тестовые заявки для команды с ID 19
+          const mockRequests = [
+            {
+              id: 1,
+              userId: 101,
+              userName: 'Иван Петров',
+              userEmail: 'ivan@example.com',
+              status: 'pending',
+              createdAt: new Date().toISOString(),
+              message: 'Хочу присоединиться к команде 19'
+            }
+          ];
+          localStorage.setItem(`team_19_requests`, JSON.stringify(mockRequests));
+        } else {
+          setTeams(parsedTeams);
+        }
+      } catch (error) {
+        console.error('Error parsing localStorage teams:', error);
+        initializeData(); // При ошибке парсинга, инициализируем данные заново
+      }
     }
   }, []);
 
@@ -185,6 +271,17 @@ const AdminTeams: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Управление командами</h1>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            setSelectedTeam(null);
+            form.resetFields();
+            setIsModalVisible(true);
+          }}
+        >
+          Создать команду
+        </Button>
       </div>
 
       <Table

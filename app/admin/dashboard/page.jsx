@@ -25,6 +25,7 @@ import {
   FaTrash,
   FaPlus
 } from 'react-icons/fa';
+import Link from 'next/link';
 import useSocket from '../../hooks/useSocket';
 
 // Регистрируем необходимые компоненты для ChartJS
@@ -415,10 +416,10 @@ export default function AdminDashboard() {
           <div>
             <div className="mb-6 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Управление соревнованиями</h2>
-              <button className="btn-primary flex items-center space-x-2">
+              <Link href="/admin/competitions/create" className="btn-primary flex items-center space-x-2">
                 <FaPlus />
                 <span>Создать соревнование</span>
-              </button>
+              </Link>
             </div>
             
             <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
@@ -474,10 +475,10 @@ export default function AdminDashboard() {
           <div>
             <div className="mb-6 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Управление командами</h2>
-              <button className="btn-primary flex items-center space-x-2">
+              <Link href="/admin/teams/create" className="btn-primary flex items-center space-x-2">
                 <FaPlus />
                 <span>Создать команду</span>
-              </button>
+              </Link>
             </div>
             
             <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
@@ -523,10 +524,10 @@ export default function AdminDashboard() {
           <div>
             <div className="mb-6 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Управление пользователями</h2>
-              <button className="btn-primary flex items-center space-x-2">
+              <Link href="/admin/users/create" className="btn-primary flex items-center space-x-2">
                 <FaPlus />
                 <span>Добавить пользователя</span>
-              </button>
+              </Link>
             </div>
             
             <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">

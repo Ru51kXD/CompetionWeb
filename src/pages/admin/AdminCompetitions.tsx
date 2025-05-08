@@ -159,7 +159,7 @@ const AdminCompetitions: React.FC = () => {
       key: 'actions',
       render: (_: any, record: Competition) => (
         <Space>
-          <Button onClick={() => navigate(`/competitions/${record.id}`)}>
+          <Button onClick={() => navigate(`/admin/competitions/${record.id}`)}>
             Просмотр
           </Button>
           <Button
@@ -192,6 +192,13 @@ const AdminCompetitions: React.FC = () => {
             onChange={(e) => setSearchText(e.target.value)}
             style={{ width: 300 }}
           />
+          <Button 
+            type="primary" 
+            icon={<PlusOutlined />} 
+            onClick={() => navigate('/admin/competitions/create')}
+          >
+            Создать соревнование
+          </Button>
         </div>
 
         <Table
