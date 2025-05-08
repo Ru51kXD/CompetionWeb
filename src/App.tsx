@@ -16,6 +16,7 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminRequests from './pages/admin/AdminRequests';
 import Search from './pages/Search';
 import Leaders from './pages/Leaders';
+import AdminCompetitionCreate from './pages/admin/AdminCompetitionCreate';
 import './App.css';
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
             <Route path="/admin/teams/:teamId" element={<AdminTeamDetails />} />
             <Route path="/admin/competitions" element={<AdminCompetitions />} />
             <Route path="/admin/competitions/:competitionId" element={<AdminCompetitionDetails />} />
+            <Route path="/admin/competitions/create" element={<AdminCompetitionCreate />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/requests" element={<AdminRequests />} />
           </Routes>

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Button, Table, Tag, message, Modal, Space } from 'antd';
+import { Card, Button, Table, Tag, message, Modal, Space, Spin } from 'antd';
 import { ArrowLeftOutlined, UserOutlined, TrophyOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { Team } from '../../types/team';
 import { Competition } from '../../types/competition';
+import { mockTeams } from '../../data/mockData';
 
 interface JoinRequest {
   id: number;
@@ -25,48 +26,59 @@ const AdminTeamDetails: React.FC = () => {
   useEffect(() => {
     const fetchTeamAndRequests = () => {
       try {
-        // Загружаем данные команды
+        console.log('Fetching team with ID:', teamId);
+        
+        // Сначала проверяем localStorage
         const storedTeams = localStorage.getItem('teams');
+        let teams: Team[] = [];
+        
         if (storedTeams) {
-          const teams = JSON.parse(storedTeams);
-          const foundTeam = teams.find((t: Team) => t.id === Number(teamId));
-          if (foundTeam) {
-            setTeam(foundTeam);
-          } else {
-            message.error('Команда не найдена');
-            navigate('/admin/teams');
-            return;
-          }
+          teams = JSON.parse(storedTeams);
+        } else {
+          // Если данных нет в localStorage, используем mock-данные
+          teams = mockTeams;
+          localStorage.setItem('teams', JSON.stringify(mockTeams));
         }
 
-        // Загружаем заявки на вступление
-        const storedRequests = localStorage.getItem(`team_${teamId}_requests`);
-        if (storedRequests) {
-          setJoinRequests(JSON.parse(storedRequests));
+        // Ищем команду
+        const foundTeam = teams.find(t => t.id === Number(teamId));
+        console.log('Found team:', foundTeam);
+
+        if (foundTeam) {
+          setTeam(foundTeam);
+          
+          // Загружаем заявки
+          const storedRequests = localStorage.getItem(`team_${teamId}_requests`);
+          if (storedRequests) {
+            setJoinRequests(JSON.parse(storedRequests));
+          } else {
+            // Создаем тестовые заявки
+            const mockRequests: JoinRequest[] = [
+              {
+                id: 1,
+                userId: 101,
+                userName: 'Иван Петров',
+                userEmail: 'ivan@example.com',
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                message: 'Хочу присоединиться к команде'
+              },
+              {
+                id: 2,
+                userId: 102,
+                userName: 'Мария Сидорова',
+                userEmail: 'maria@example.com',
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                message: 'Имею опыт участия в подобных соревнованиях'
+              }
+            ];
+            setJoinRequests(mockRequests);
+            localStorage.setItem(`team_${teamId}_requests`, JSON.stringify(mockRequests));
+          }
         } else {
-          // Если заявок нет, создаем тестовые данные
-          const mockRequests: JoinRequest[] = [
-            {
-              id: 1,
-              userId: 101,
-              userName: 'Иван Петров',
-              userEmail: 'ivan@example.com',
-              status: 'pending',
-              createdAt: new Date().toISOString(),
-              message: 'Хочу присоединиться к команде'
-            },
-            {
-              id: 2,
-              userId: 102,
-              userName: 'Мария Сидорова',
-              userEmail: 'maria@example.com',
-              status: 'pending',
-              createdAt: new Date().toISOString(),
-              message: 'Имею опыт участия в подобных соревнованиях'
-            }
-          ];
-          setJoinRequests(mockRequests);
-          localStorage.setItem(`team_${teamId}_requests`, JSON.stringify(mockRequests));
+          message.error('Команда не найдена');
+          navigate('/admin/teams');
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -76,7 +88,9 @@ const AdminTeamDetails: React.FC = () => {
       }
     };
 
-    fetchTeamAndRequests();
+    if (teamId) {
+      fetchTeamAndRequests();
+    }
   }, [teamId, navigate]);
 
   const handleApproveRequest = (request: JoinRequest) => {
@@ -90,7 +104,6 @@ const AdminTeamDetails: React.FC = () => {
         setJoinRequests(updatedRequests);
         localStorage.setItem(`team_${teamId}_requests`, JSON.stringify(updatedRequests));
 
-        // Добавляем пользователя в команду
         if (team) {
           const updatedTeam = {
             ...team,
@@ -106,7 +119,6 @@ const AdminTeamDetails: React.FC = () => {
           };
           setTeam(updatedTeam);
           
-          // Обновляем команду в localStorage
           const storedTeams = localStorage.getItem('teams');
           if (storedTeams) {
             const teams = JSON.parse(storedTeams);
@@ -270,11 +282,30 @@ const AdminTeamDetails: React.FC = () => {
   ];
 
   if (loading) {
-    return <div>Загрузка...</div>;
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Spin size="large" tip="Загрузка данных..." />
+      </div>
+    );
   }
 
   if (!team) {
-    return <div>Команда не найдена</div>;
+    return (
+      <div className="p-6">
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate('/admin/teams')}
+          className="mb-4"
+        >
+          Назад к списку команд
+        </Button>
+        <Card>
+          <div className="text-center text-red-500">
+            Команда не найдена
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   return (

@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mockTeams } from '../../data/mockData';
 import { Team } from '../../types/team';
-import AdminTeamDetails from './AdminTeamDetails';
 import { Button, Table, Modal, Form, Input, Select, message } from 'antd';
-import { EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -16,17 +15,59 @@ const AdminTeams: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Загружаем команды из localStorage или используем mock-данные
+    // Инициализация данных при первом запуске
+    const initializeData = () => {
+      try {
+        // Очищаем localStorage для команд
+        localStorage.removeItem('teams');
+        
+        // Сохраняем mock-данные
+        localStorage.setItem('teams', JSON.stringify(mockTeams));
+        setTeams(mockTeams);
+        
+        // Инициализируем заявки для каждой команды
+        mockTeams.forEach(team => {
+          const mockRequests = [
+            {
+              id: 1,
+              userId: 101,
+              userName: 'Иван Петров',
+              userEmail: 'ivan@example.com',
+              status: 'pending',
+              createdAt: new Date().toISOString(),
+              message: 'Хочу присоединиться к команде'
+            },
+            {
+              id: 2,
+              userId: 102,
+              userName: 'Мария Сидорова',
+              userEmail: 'maria@example.com',
+              status: 'pending',
+              createdAt: new Date().toISOString(),
+              message: 'Имею опыт участия в подобных соревнованиях'
+            }
+          ];
+          localStorage.setItem(`team_${team.id}_requests`, JSON.stringify(mockRequests));
+        });
+
+        message.success('Данные успешно инициализированы');
+      } catch (error) {
+        console.error('Error initializing data:', error);
+        message.error('Ошибка при инициализации данных');
+      }
+    };
+
+    // Проверяем, есть ли данные в localStorage
     const storedTeams = localStorage.getItem('teams');
-    if (storedTeams) {
-      setTeams(JSON.parse(storedTeams));
+    if (!storedTeams) {
+      initializeData();
     } else {
-      setTeams(mockTeams);
-      localStorage.setItem('teams', JSON.stringify(mockTeams));
+      setTeams(JSON.parse(storedTeams));
     }
   }, []);
 
   const handleViewTeam = (team: Team) => {
+    console.log('Navigating to team:', team.id);
     navigate(`/admin/teams/${team.id}`);
   };
 
@@ -144,16 +185,6 @@ const AdminTeams: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Управление командами</h1>
-        <Button
-          type="primary"
-          onClick={() => {
-            setSelectedTeam(null);
-            form.resetFields();
-            setIsModalVisible(true);
-          }}
-        >
-          Создать команду
-        </Button>
       </div>
 
       <Table
