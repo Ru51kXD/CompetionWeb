@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { FaUsers, FaTrophy, FaSearch, FaCalendarAlt, FaMapMarkerAlt, FaFilter, FaPlusCircle, FaMedal, FaChevronRight, FaChess, FaUser } from 'react-icons/fa'
+import { FaUsers, FaTrophy, FaSearch, FaCalendarAlt, FaMapMarkerAlt, FaFilter, FaPlusCircle, FaMedal, FaChevronRight, FaChess, FaUser, FaTicketAlt, FaSearchMinus } from 'react-icons/fa'
 
 // Mock data for competitions
 const mockCompetitions = [
@@ -120,6 +120,71 @@ const mockCompetitions = [
   }
 ]
 
+// Массив стадионов в Астане
+const astanaStadiums = [
+  {
+    name: "Астана Арена",
+    address: "Туран 54, Астана, Казахстан",
+    coordinates: [71.428152, 51.089079]
+  },
+  {
+    name: "Центральный стадион Астаны",
+    address: "Кенесары 54, Астана, Казахстан",
+    coordinates: [71.429680, 51.142890]
+  },
+  {
+    name: "Стадион им. Х. Мунайтпасова",
+    address: "Кабанбай батыра 49, Астана, Казахстан",
+    coordinates: [71.415234, 51.122356]
+  },
+  {
+    name: "Спорткомплекс Казахстан",
+    address: "Мунайтпасова 15, Астана, Казахстан",
+    coordinates: [71.431567, 51.127890]
+  },
+  {
+    name: "Футбольный центр Туран",
+    address: "Карталы 6, Астана, Казахстан",
+    coordinates: [71.416592, 51.098765]
+  },
+  {
+    name: "ФОК Алатау",
+    address: "Сатпаева 23, Астана, Казахстан",
+    coordinates: [71.435678, 51.139012]
+  },
+  {
+    name: "Дворец спорта Онер",
+    address: "Республики 43, Астана, Казахстан",
+    coordinates: [71.423456, 51.127654]
+  },
+  {
+    name: "Спортивный комплекс Даулет",
+    address: "Победы 32, Астана, Казахстан",
+    coordinates: [71.442134, 51.113451]
+  }
+];
+
+// Функция для получения случайного стадиона
+const getRandomStadium = () => {
+  const randomIndex = Math.floor(Math.random() * astanaStadiums.length);
+  return astanaStadiums[randomIndex];
+};
+
+// Функция для инициализации соревнований с случайными стадионами в Астане
+const initializeCompetitionsWithStadiums = (competitions) => {
+  return competitions.map(competition => {
+    const stadium = getRandomStadium();
+    return {
+      ...competition,
+      location: stadium.name,
+      address: stadium.address,
+      city: "Астана",
+      country: "Казахстан",
+      coordinates: stadium.coordinates
+    };
+  });
+};
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -180,23 +245,39 @@ export default function CompetitionsPage() {
       if (storedCompetitions) {
         const parsedCompetitions = JSON.parse(storedCompetitions)
         if (Array.isArray(parsedCompetitions) && parsedCompetitions.length > 0) {
-          // Combine stored competitions with mock data, avoiding duplicates by id
-          const combinedCompetitions = [...parsedCompetitions]
+          // Проверим, есть ли у соревнований координаты и адреса в Астане
+          const needsStadiums = !parsedCompetitions.some(comp => 
+            comp.city === "Астана" && comp.coordinates && comp.coordinates.length === 2
+          );
           
-          const existingIds = new Set(parsedCompetitions.map(comp => comp.id))
-          mockCompetitions.forEach(comp => {
-            if (!existingIds.has(comp.id)) {
-              combinedCompetitions.push(comp)
-            }
-          })
-          
-          setCompetitions(combinedCompetitions)
+          if (needsStadiums) {
+            // Добавим случайные стадионы всем соревнованиям
+            const updatedCompetitions = initializeCompetitionsWithStadiums(parsedCompetitions);
+            localStorage.setItem('competitions', JSON.stringify(updatedCompetitions));
+            setCompetitions(updatedCompetitions);
+          } else {
+            // Combine stored competitions with mock data, avoiding duplicates by id
+            const combinedCompetitions = [...parsedCompetitions]
+            
+            const existingIds = new Set(parsedCompetitions.map(comp => comp.id))
+            const mocksWithStadiums = initializeCompetitionsWithStadiums(mockCompetitions);
+            mocksWithStadiums.forEach(comp => {
+              if (!existingIds.has(comp.id)) {
+                combinedCompetitions.push(comp)
+              }
+            })
+            
+            setCompetitions(combinedCompetitions)
+          }
         } else {
-          setCompetitions(mockCompetitions)
+          const competitionsWithStadiums = initializeCompetitionsWithStadiums(mockCompetitions);
+          setCompetitions(competitionsWithStadiums);
+          localStorage.setItem('competitions', JSON.stringify(competitionsWithStadiums));
         }
       } else {
-        setCompetitions(mockCompetitions)
-        localStorage.setItem('competitions', JSON.stringify(mockCompetitions))
+        const competitionsWithStadiums = initializeCompetitionsWithStadiums(mockCompetitions);
+        setCompetitions(competitionsWithStadiums);
+        localStorage.setItem('competitions', JSON.stringify(competitionsWithStadiums));
       }
     } catch (error) {
       console.error('Ошибка при загрузке соревнований:', error)
@@ -619,43 +700,72 @@ export default function CompetitionsPage() {
                             {competition.description}
                           </p>
                           
-                          <div className="border-t border-gray-100 pt-4 mt-auto">
-                            <div className="flex items-center text-sm text-gray-600 mb-2">
-                              <FaCalendarAlt className="mr-2 text-primary-500" />
-                              <span>
-                                {formatDate(competition.startDate)}
-                                {competition.endDate && competition.endDate !== competition.startDate && 
-                                  ` - ${formatDate(competition.endDate)}`
-                                }
-                              </span>
-                            </div>
-                            
-                            <div className="flex items-center text-sm text-gray-600 mb-4">
-                              <FaMapMarkerAlt className="mr-2 text-primary-500" />
-                              <span>{competition.location}</span>
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center text-sm">
-                                {competition.competitionType === 'individual' ? (
-                                  <>
-                                    <FaUser className="mr-1 text-gray-500" />
-                                    <span className="text-gray-700 font-medium">{competition.participantCount} участников</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <FaUsers className="mr-1 text-gray-500" />
-                                    <span className="text-gray-700 font-medium">{competition.participantCount} команд</span>
-                                  </>
-                                )}
+                          <div className="space-y-2 mb-4">
+                            <div className="flex items-start">
+                              <FaCalendarAlt className="text-primary-500 mr-2 mt-1" />
+                              <div>
+                                <p className="text-sm text-gray-700">
+                                  {formatDate(competition.startDate)}
+                                  {competition.endDate && competition.endDate !== competition.startDate && 
+                                    ` - ${formatDate(competition.endDate)}`
+                                  }
+                                </p>
                               </div>
-                              
-                              <Link
-                                href={`/competitions/${competition.id}`}
-                                className="text-primary-600 hover:text-primary-700 font-medium text-sm flex items-center"
-                              >
-                                Подробнее <FaChevronRight className="ml-1" />
-                              </Link>
+                            </div>
+                            
+                            <div className="flex items-start">
+                              <FaMapMarkerAlt className="text-primary-500 mr-2 mt-1" />
+                              <p className="text-sm text-gray-700 line-clamp-1">{competition.location}</p>
+                            </div>
+                            
+                            <div className="flex items-start">
+                              <FaUsers className="text-primary-500 mr-2 mt-1" />
+                              <p className="text-sm text-gray-700">
+                                {competition.participantCount || 0} 
+                                {competition.competitionType === 'team' 
+                                  ? ' команд' 
+                                  : ' участников'
+                                } из {competition.maxTeams || competition.maxParticipants || '∞'}
+                              </p>
+                            </div>
+                            
+                            {/* Prize Pool */}
+                            {competition.prizePool > 0 && (
+                              <div className="flex items-start">
+                                <FaTrophy className="text-primary-500 mr-2 mt-1" />
+                                <p className="text-sm font-medium text-green-600">
+                                  Призовой фонд: {competition.prizePool.toLocaleString()} ₸
+                                </p>
+                              </div>
+                            )}
+                            
+                            {/* Entry Fee */}
+                            {competition.entryFee !== undefined && (
+                              <div className="flex items-start">
+                                <FaTicketAlt className="text-primary-500 mr-2 mt-1" />
+                                <p className="text-sm text-gray-700">
+                                  {competition.entryFee > 0 
+                                    ? <span className="font-medium text-yellow-600">Участие: {competition.entryFee.toLocaleString()} ₸</span> 
+                                    : <span className="text-green-600">Бесплатное участие</span>
+                                  }
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex justify-between items-center">
+                            <Link
+                              href={`/competitions/${competition.id}`}
+                              className="text-primary-600 hover:text-primary-800 font-medium flex items-center"
+                            >
+                              Подробнее <FaChevronRight className="ml-1" />
+                            </Link>
+                            <div>
+                              {competition.creatorName && (
+                                <span className="text-xs text-gray-500">
+                                  Организатор: {competition.creatorName}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

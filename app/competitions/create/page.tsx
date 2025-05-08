@@ -28,7 +28,10 @@ export default function CreateCompetitionPage() {
     maxTeamSize: 10, // Maximum number of members per team
     coordinates: [37.6156, 55.7522] as [number, number], // Москва по умолчанию
     city: '',
-    country: ''
+    country: '',
+    competitionType: 'team', // Default to team competition
+    prizePool: 0, // Prize pool amount
+    entryFee: 0 // Entry fee amount
   })
   const [errors, setErrors] = useState({
     title: '',
@@ -165,6 +168,16 @@ export default function CreateCompetitionPage() {
       isValid = false
     }
 
+    if (formData.prizePool < 0) {
+      newErrors.title = 'Призовой фонд не может быть отрицательным'
+      isValid = false
+    }
+    
+    if (formData.entryFee < 0) {
+      newErrors.title = 'Стоимость участия не может быть отрицательной'
+      isValid = false
+    }
+
     setErrors(newErrors)
     return isValid
   }
@@ -187,11 +200,15 @@ export default function CreateCompetitionPage() {
           image: formData.image || 'https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?q=80&w=2070',
           participantCount: selectedTeams.length || 0,
           status: formData.status,
-          teams: selectedTeams,
+          teams: formData.competitionType === 'team' ? selectedTeams : [],
           maxTeams: formData.maxTeams,
           maxTeamSize: formData.maxTeamSize,
           createdBy: user?.id || 0,
-          creatorName: user?.name || 'Аноним'
+          creatorName: user?.name || 'Аноним',
+          competitionType: formData.competitionType,
+          prizePool: formData.prizePool,
+          entryFee: formData.entryFee,
+          paidTeams: [] // Teams that have paid the entry fee
         }
         
         // Load existing competitions from localStorage
@@ -325,6 +342,27 @@ export default function CreateCompetitionPage() {
                 </div>
                 
                 <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="competitionType">
+                    Тип соревнования *
+                  </label>
+                  <select
+                    id="competitionType"
+                    name="competitionType"
+                    value={formData.competitionType}
+                    onChange={handleChange}
+                    className="input"
+                  >
+                    <option value="team">Командное</option>
+                    <option value="individual">Индивидуальное</option>
+                  </select>
+                  <p className="text-gray-500 text-xs mt-1">
+                    {formData.competitionType === 'team' 
+                      ? 'В соревновании участвуют команды' 
+                      : 'В соревновании участвуют отдельные спортсмены'}
+                  </p>
+                </div>
+                
+                <div>
                   <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="startDate">
                     Дата начала *
                   </label>
@@ -402,49 +440,122 @@ export default function CreateCompetitionPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="maxTeams">
-                    Максимальное количество команд *
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="prizePool">
+                    Призовой фонд (₸)
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FaUsers className="text-gray-400" />
+                      <FaTrophy className="text-gray-400" />
                     </div>
                     <input
-                      id="maxTeams"
-                      name="maxTeams"
+                      id="prizePool"
+                      name="prizePool"
                       type="number"
-                      min="1"
-                      max="100"
-                      value={formData.maxTeams}
+                      min="0"
+                      value={formData.prizePool}
                       onChange={handleChange}
-                      className={`input pl-10 ${errors.maxTeams ? 'border-red-500' : ''}`}
+                      className="input pl-10"
+                      placeholder="Укажите сумму призового фонда"
                     />
                   </div>
-                  {errors.maxTeams && <p className="text-red-500 text-xs mt-1">{errors.maxTeams}</p>}
-                  <p className="text-gray-500 text-xs mt-1">Выбрано команд: {selectedTeams.length} из {formData.maxTeams}</p>
+                  <p className="text-gray-500 text-xs mt-1">Укажите 0, если призового фонда нет</p>
                 </div>
                 
                 <div>
-                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="maxTeamSize">
-                    Максимальный размер команды *
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="entryFee">
+                    Стоимость участия (₸)
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <FaUsers className="text-gray-400" />
                     </div>
                     <input
-                      id="maxTeamSize"
-                      name="maxTeamSize"
+                      id="entryFee"
+                      name="entryFee"
                       type="number"
-                      min="1"
-                      max="50"
-                      value={formData.maxTeamSize}
+                      min="0"
+                      value={formData.entryFee}
                       onChange={handleChange}
-                      className={`input pl-10 ${errors.maxTeamSize ? 'border-red-500' : ''}`}
+                      className="input pl-10"
+                      placeholder="Укажите стоимость участия"
                     />
                   </div>
-                  {errors.maxTeamSize && <p className="text-red-500 text-xs mt-1">{errors.maxTeamSize}</p>}
+                  <p className="text-gray-500 text-xs mt-1">Укажите 0 для бесплатного участия</p>
                 </div>
+                
+                {formData.competitionType === 'team' && (
+                  <>
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="maxTeams">
+                        Максимальное количество команд *
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FaUsers className="text-gray-400" />
+                        </div>
+                        <input
+                          id="maxTeams"
+                          name="maxTeams"
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={formData.maxTeams}
+                          onChange={handleChange}
+                          className={`input pl-10 ${errors.maxTeams ? 'border-red-500' : ''}`}
+                        />
+                      </div>
+                      {errors.maxTeams && <p className="text-red-500 text-xs mt-1">{errors.maxTeams}</p>}
+                      <p className="text-gray-500 text-xs mt-1">Выбрано команд: {selectedTeams.length} из {formData.maxTeams}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="maxTeamSize">
+                        Максимальный размер команды *
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FaUsers className="text-gray-400" />
+                        </div>
+                        <input
+                          id="maxTeamSize"
+                          name="maxTeamSize"
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={formData.maxTeamSize}
+                          onChange={handleChange}
+                          className={`input pl-10 ${errors.maxTeamSize ? 'border-red-500' : ''}`}
+                        />
+                      </div>
+                      {errors.maxTeamSize && <p className="text-red-500 text-xs mt-1">{errors.maxTeamSize}</p>}
+                    </div>
+                  </>
+                )}
+                
+                {formData.competitionType === 'individual' && (
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="maxParticipants">
+                      Максимальное количество участников *
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <FaUsers className="text-gray-400" />
+                      </div>
+                      <input
+                        id="maxTeams"
+                        name="maxTeams"
+                        type="number"
+                        min="1"
+                        max="1000"
+                        value={formData.maxTeams}
+                        onChange={handleChange}
+                        className={`input pl-10 ${errors.maxTeams ? 'border-red-500' : ''}`}
+                      />
+                    </div>
+                    {errors.maxTeams && <p className="text-red-500 text-xs mt-1">{errors.maxTeams}</p>}
+                    <p className="text-gray-500 text-xs mt-1">Лимит участников для индивидуального соревнования</p>
+                  </div>
+                )}
                 
                 <div className="md:col-span-2">
                   <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="description">
@@ -463,68 +574,70 @@ export default function CreateCompetitionPage() {
                 </div>
               </div>
               
-              {/* Team selection section */}
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold mb-4 flex items-center">
-                  <FaUsers className="mr-2 text-primary-500" /> Выбор команд-участников
-                </h3>
-                
-                <div className="flex flex-wrap gap-3 mb-4">
-                  {selectedTeams.length > 0 ? (
-                    selectedTeams.map(teamId => {
-                      const team = teams.find(t => t.id === teamId)
-                      return team ? (
-                        <div 
-                          key={teamId}
-                          className="bg-gray-100 rounded-full py-1 px-3 flex items-center text-sm"
-                        >
-                          <span className="mr-2">{team.name}</span>
-                          <button 
-                            type="button"
-                            onClick={() => removeSelectedTeam(teamId)}
-                            className="text-gray-500 hover:text-red-500"
+              {/* Team selection section - only shown for team competitions */}
+              {formData.competitionType === 'team' && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <FaUsers className="mr-2 text-primary-500" /> Выбор команд-участников
+                  </h3>
+                  
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    {selectedTeams.length > 0 ? (
+                      selectedTeams.map(teamId => {
+                        const team = teams.find(t => t.id === teamId)
+                        return team ? (
+                          <div 
+                            key={teamId}
+                            className="bg-gray-100 rounded-full py-1 px-3 flex items-center text-sm"
                           >
-                            <FaTrash size={12} />
-                          </button>
-                        </div>
-                      ) : null
-                    })
-                  ) : (
-                    <p className="text-gray-500 text-sm">Нет выбранных команд. Выберите команды из списка ниже.</p>
+                            <span className="mr-2">{team.name}</span>
+                            <button 
+                              type="button"
+                              onClick={() => removeSelectedTeam(teamId)}
+                              className="text-gray-500 hover:text-red-500"
+                            >
+                              <FaTrash size={12} />
+                            </button>
+                          </div>
+                        ) : null
+                      })
+                    ) : (
+                      <p className="text-gray-500 text-sm">Нет выбранных команд. Выберите команды из списка ниже.</p>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <select
+                      className="input flex-grow"
+                      onChange={handleTeamSelect}
+                      value=""
+                    >
+                      <option value="">-- Выберите команду --</option>
+                      {teams
+                        .filter(team => !selectedTeams.includes(team.id))
+                        .map(team => (
+                          <option key={team.id} value={team.id}>
+                            {team.name} ({team.memberCount || 0} участников)
+                          </option>
+                        ))
+                      }
+                    </select>
+                    <button 
+                      type="button"
+                      onClick={() => document.getElementById('team-select')?.focus()}
+                      className="btn-outline py-2 px-4 flex items-center"
+                      disabled={selectedTeams.length >= formData.maxTeams}
+                    >
+                      <FaPlus className="mr-1" /> Добавить
+                    </button>
+                  </div>
+                  {errors.maxTeams && (
+                    <p className="text-yellow-600 text-sm mt-2 flex items-center">
+                      <FaInfoCircle className="mr-1" /> {errors.maxTeams}
+                    </p>
                   )}
                 </div>
-                
-                <div className="flex gap-2">
-                  <select
-                    className="input flex-grow"
-                    onChange={handleTeamSelect}
-                    value=""
-                  >
-                    <option value="">-- Выберите команду --</option>
-                    {teams
-                      .filter(team => !selectedTeams.includes(team.id))
-                      .map(team => (
-                        <option key={team.id} value={team.id}>
-                          {team.name} ({team.memberCount || 0} участников)
-                        </option>
-                      ))
-                    }
-                  </select>
-                  <button 
-                    type="button"
-                    onClick={() => document.getElementById('team-select')?.focus()}
-                    className="btn-outline py-2 px-4 flex items-center"
-                    disabled={selectedTeams.length >= formData.maxTeams}
-                  >
-                    <FaPlus className="mr-1" /> Добавить
-                  </button>
-                </div>
-                {errors.maxTeams && (
-                  <p className="text-yellow-600 text-sm mt-2 flex items-center">
-                    <FaInfoCircle className="mr-1" /> {errors.maxTeams}
-                  </p>
-                )}
-              </div>
+              )}
               
               <div className="flex justify-end space-x-3">
                 <Link

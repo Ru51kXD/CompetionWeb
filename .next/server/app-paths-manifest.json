@@ -1,8 +1,1 @@
-{
-  "/register/page": "app/register/page.js",
-  "/login/page": "app/login/page.js",
-  "/competitions/create/page": "app/competitions/create/page.js",
-  "/page": "app/page.js",
-  "/competitions/[id]/page": "app/competitions/[id]/page.js",
-  "/competitions/page": "app/competitions/page.js"
-}
+{}

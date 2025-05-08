@@ -6,8 +6,9 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { FaUser, FaEnvelope, FaLock, FaCheck, FaExclamationTriangle, FaEdit, FaSave, FaCalendarAlt, FaTrophy, FaBell, FaMapMarkerAlt, FaMoon, FaSun, FaPalette, FaWater } from 'react-icons/fa'
+import { FaUser, FaEnvelope, FaLock, FaCheck, FaExclamationTriangle, FaEdit, FaSave, FaCalendarAlt, FaTrophy, FaBell, FaMapMarkerAlt, FaMoon, FaSun, FaPalette, FaWater, FaCreditCard, FaPlus, FaTrash, FaStar } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
+import { PaymentCard } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import Link from 'next/link'
 
@@ -21,8 +22,12 @@ export default function ProfilePage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [userTeams, setUserTeams] = useState([])
   const [upcomingCompetitions, setUpcomingCompetitions] = useState([])
+  const [unpaidCompetitions, setUnpaidCompetitions] = useState([])
   const [avatarUrl, setAvatarUrl] = useState('https://randomuser.me/api/portraits/men/22.jpg')
   const [showThemeSelector, setShowThemeSelector] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [selectedCompetition, setSelectedCompetition] = useState(null)
+  const [selectedTeam, setSelectedTeam] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -34,6 +39,23 @@ export default function ProfilePage() {
     email: '',
     password: '',
     confirmPassword: '',
+    general: ''
+  })
+  const [paymentCards, setPaymentCards] = useState<PaymentCard[]>([])
+
+  // Payment card management
+  const [showAddCardModal, setShowAddCardModal] = useState(false)
+  const [newCardData, setNewCardData] = useState({
+    cardNumber: '',
+    expiryDate: '',
+    cvv: '',
+    cardholderName: ''
+  })
+  const [cardErrors, setCardErrors] = useState({
+    cardNumber: '',
+    expiryDate: '',
+    cvv: '',
+    cardholderName: '',
     general: ''
   })
 
@@ -54,6 +76,11 @@ export default function ProfilePage() {
     
     // Fetch user teams and upcoming competitions
     fetchUserTeamsAndCompetitions()
+    
+    // Load saved payment cards
+    if (user.paymentCards) {
+      setPaymentCards(user.paymentCards)
+    }
     
     // Generate avatar URL based on user ID for consistency
     if (user.id) {
@@ -91,10 +118,22 @@ export default function ProfilePage() {
             competition.teams.some(teamId => userTeamIds.includes(teamId))
           )
           
+          // Get unpaid competitions (competitions with entry fee where the team hasn't paid)
+          const unpaidCompetitions = teamCompetitions.filter(competition => 
+            competition.entryFee && 
+            competition.entryFee > 0 && 
+            competition.teams.some(teamId => {
+              // Check if team is part of user's teams and hasn't paid
+              return userTeamIds.includes(teamId) && 
+                (!competition.paidTeams || !competition.paidTeams.includes(teamId))
+            })
+          )
+          
           // Sort by start date
           teamCompetitions.sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
           
           setUpcomingCompetitions(teamCompetitions)
+          setUnpaidCompetitions(unpaidCompetitions)
         }
       }
     } catch (error) {
@@ -243,6 +282,347 @@ export default function ProfilePage() {
         setIsSubmitting(false)
       }
     }
+  }
+
+  // Add payment processing function
+  const handlePayment = (competition, team) => {
+    setSelectedCompetition(competition)
+    setSelectedTeam(team)
+    setShowPaymentModal(true)
+  }
+  
+  const processPayment = () => {
+    if (!selectedCompetition || !selectedTeam) return
+    
+    try {
+      // Update competition with paid team
+      const storedCompetitions = localStorage.getItem('competitions')
+      if (storedCompetitions) {
+        const allCompetitions = JSON.parse(storedCompetitions)
+        const competitionIndex = allCompetitions.findIndex(c => c.id === selectedCompetition.id)
+        
+        if (competitionIndex !== -1) {
+          // Initialize paidTeams array if it doesn't exist
+          if (!allCompetitions[competitionIndex].paidTeams) {
+            allCompetitions[competitionIndex].paidTeams = []
+          }
+          
+          // Add team to paid teams
+          allCompetitions[competitionIndex].paidTeams.push(selectedTeam.id)
+          localStorage.setItem('competitions', JSON.stringify(allCompetitions))
+          
+          // Update local state
+          setUnpaidCompetitions(unpaidCompetitions.filter(c => c.id !== selectedCompetition.id))
+          setSuccessMessage('Оплата успешно произведена!')
+          
+          // Clear success message after 3 seconds
+          setTimeout(() => {
+            setSuccessMessage('')
+          }, 3000)
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка при обработке оплаты:', error)
+      setErrors(prev => ({
+        ...prev,
+        general: 'Произошла ошибка при обработке оплаты'
+      }))
+    } finally {
+      setShowPaymentModal(false)
+      setSelectedCompetition(null)
+      setSelectedTeam(null)
+    }
+  }
+
+  const handleCardInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    let formattedValue = value;
+
+    // Format card number with spaces after every 4 digits
+    if (name === 'cardNumber') {
+      // Remove any non-digit characters
+      const digits = value.replace(/\D/g, '');
+      // Format with spaces
+      if (digits.length > 0) {
+        const groups = digits.match(/.{1,4}/g);
+        formattedValue = groups ? groups.join(' ') : digits;
+      } else {
+        formattedValue = '';
+      }
+    }
+
+    // Format expiry date as MM/YY
+    if (name === 'expiryDate') {
+      // Remove any non-digit characters
+      const digits = value.replace(/\D/g, '');
+      
+      if (digits.length > 0) {
+        if (digits.length <= 2) {
+          formattedValue = digits;
+        } else {
+          formattedValue = `${digits.substring(0, 2)}/${digits.substring(2, 4)}`;
+        }
+      } else {
+        formattedValue = '';
+      }
+    }
+
+    // Only allow numbers for CVV
+    if (name === 'cvv') {
+      formattedValue = value.replace(/\D/g, '');
+    }
+    
+    setNewCardData(prev => ({
+      ...prev,
+      [name]: formattedValue
+    }))
+    
+    // Clear errors when typing
+    if (cardErrors[name as keyof typeof cardErrors]) {
+      setCardErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }))
+    }
+  }
+
+  const validateCardForm = () => {
+    let isValid = true
+    const newErrors = {
+      cardNumber: '',
+      expiryDate: '',
+      cvv: '',
+      cardholderName: '',
+      general: ''
+    }
+
+    // Validate card number (16 digits, can have spaces)
+    const cardNumberClean = newCardData.cardNumber.replace(/\s/g, '')
+    if (!cardNumberClean) {
+      newErrors.cardNumber = 'Номер карты обязателен'
+      isValid = false
+    } else if (cardNumberClean.length !== 16 || !/^\d+$/.test(cardNumberClean)) {
+      newErrors.cardNumber = 'Введите корректный номер карты (16 цифр)'
+      isValid = false
+    }
+
+    // Validate expiry date (MM/YY format)
+    if (!newCardData.expiryDate) {
+      newErrors.expiryDate = 'Срок действия обязателен'
+      isValid = false
+    } else if (!/^\d{2}\/\d{2}$/.test(newCardData.expiryDate)) {
+      newErrors.expiryDate = 'Введите дату в формате ММ/ГГ'
+      isValid = false
+    } else {
+      // Check if date is valid (not expired)
+      const [month, year] = newCardData.expiryDate.split('/');
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear() % 100; // Get last 2 digits
+      const currentMonth = currentDate.getMonth() + 1; // 1-12
+      
+      const expiryMonth = parseInt(month, 10);
+      const expiryYear = parseInt(year, 10);
+      
+      if (expiryMonth < 1 || expiryMonth > 12) {
+        newErrors.expiryDate = 'Неверный месяц (1-12)';
+        isValid = false;
+      } else if (
+        (expiryYear < currentYear) || 
+        (expiryYear === currentYear && expiryMonth < currentMonth)
+      ) {
+        newErrors.expiryDate = 'Срок действия карты истек';
+        isValid = false;
+      }
+    }
+
+    // Validate CVV (3 digits)
+    if (!newCardData.cvv) {
+      newErrors.cvv = 'CVV обязателен'
+      isValid = false
+    } else if (newCardData.cvv.length !== 3 || !/^\d{3}$/.test(newCardData.cvv)) {
+      newErrors.cvv = 'CVV должен содержать 3 цифры'
+      isValid = false
+    }
+
+    // Validate cardholder name
+    if (!newCardData.cardholderName.trim()) {
+      newErrors.cardholderName = 'Имя владельца карты обязательно'
+      isValid = false
+    }
+
+    setCardErrors(newErrors)
+    return isValid
+  }
+
+  const addPaymentCard = () => {
+    if (!validateCardForm()) return
+    
+    try {
+      const newCard: PaymentCard = {
+        id: Date.now(),
+        cardNumber: formatCardNumber(newCardData.cardNumber),
+        expiryDate: newCardData.expiryDate,
+        cardholderName: newCardData.cardholderName,
+        isDefault: paymentCards.length === 0 // Make default if it's the first card
+      }
+      
+      const updatedCards = [...paymentCards, newCard]
+      setPaymentCards(updatedCards)
+      
+      // Update user in localStorage
+      if (user) {
+        const updatedUser = {
+          ...user,
+          paymentCards: updatedCards
+        }
+        
+        // Update users array in localStorage
+        const storedUsers = localStorage.getItem('users')
+        if (storedUsers) {
+          const users = JSON.parse(storedUsers)
+          const userIndex = users.findIndex((u: any) => u.id === user.id)
+          
+          if (userIndex !== -1) {
+            users[userIndex] = {
+              ...users[userIndex],
+              paymentCards: updatedCards
+            }
+            localStorage.setItem('users', JSON.stringify(users))
+          }
+        }
+        
+        // Update current user in localStorage
+        localStorage.setItem('user', JSON.stringify(updatedUser))
+      }
+      
+      setSuccessMessage('Карта успешно добавлена!')
+      setTimeout(() => setSuccessMessage(''), 3000)
+      setShowAddCardModal(false)
+      
+      // Reset form
+      setNewCardData({
+        cardNumber: '',
+        expiryDate: '',
+        cvv: '',
+        cardholderName: ''
+      })
+    } catch (error) {
+      console.error('Ошибка при добавлении карты:', error)
+      setCardErrors(prev => ({
+        ...prev,
+        general: 'Произошла ошибка при добавлении карты'
+      }))
+    }
+  }
+
+  const removePaymentCard = (cardId: number) => {
+    try {
+      const updatedCards = paymentCards.filter(card => card.id !== cardId)
+      
+      // If we're removing the default card, make the first remaining card default
+      if (paymentCards.find(card => card.id === cardId)?.isDefault && updatedCards.length > 0) {
+        updatedCards[0].isDefault = true
+      }
+      
+      setPaymentCards(updatedCards)
+      
+      // Update user in localStorage
+      if (user) {
+        const updatedUser = {
+          ...user,
+          paymentCards: updatedCards
+        }
+        
+        // Update users array in localStorage
+        const storedUsers = localStorage.getItem('users')
+        if (storedUsers) {
+          const users = JSON.parse(storedUsers)
+          const userIndex = users.findIndex((u: any) => u.id === user.id)
+          
+          if (userIndex !== -1) {
+            users[userIndex] = {
+              ...users[userIndex],
+              paymentCards: updatedCards
+            }
+            localStorage.setItem('users', JSON.stringify(users))
+          }
+        }
+        
+        // Update current user in localStorage
+        localStorage.setItem('user', JSON.stringify(updatedUser))
+      }
+      
+      setSuccessMessage('Карта успешно удалена')
+      setTimeout(() => setSuccessMessage(''), 3000)
+    } catch (error) {
+      console.error('Ошибка при удалении карты:', error)
+      setErrors(prev => ({
+        ...prev,
+        general: 'Произошла ошибка при удалении карты'
+      }))
+    }
+  }
+
+  const setDefaultCard = (cardId: number) => {
+    try {
+      const updatedCards = paymentCards.map(card => ({
+        ...card,
+        isDefault: card.id === cardId
+      }))
+      
+      setPaymentCards(updatedCards)
+      
+      // Update user in localStorage
+      if (user) {
+        const updatedUser = {
+          ...user,
+          paymentCards: updatedCards
+        }
+        
+        // Update users array in localStorage
+        const storedUsers = localStorage.getItem('users')
+        if (storedUsers) {
+          const users = JSON.parse(storedUsers)
+          const userIndex = users.findIndex((u: any) => u.id === user.id)
+          
+          if (userIndex !== -1) {
+            users[userIndex] = {
+              ...users[userIndex],
+              paymentCards: updatedCards
+            }
+            localStorage.setItem('users', JSON.stringify(users))
+          }
+        }
+        
+        // Update current user in localStorage
+        localStorage.setItem('user', JSON.stringify(updatedUser))
+      }
+      
+      setSuccessMessage('Карта по умолчанию изменена')
+      setTimeout(() => setSuccessMessage(''), 3000)
+    } catch (error) {
+      console.error('Ошибка при установке карты по умолчанию:', error)
+      setErrors(prev => ({
+        ...prev,
+        general: 'Произошла ошибка при установке карты по умолчанию'
+      }))
+    }
+  }
+
+  // Format card number with spaces for display (1234 5678 9012 3456)
+  const formatCardNumber = (cardNumber: string) => {
+    const cleaned = cardNumber.replace(/\s+/g, '')
+    const groups = cleaned.match(/.{1,4}/g)
+    return groups ? groups.join(' ') : cleaned
+  }
+
+  // Mask card number for display (only last 4 digits visible)
+  const maskCardNumber = (cardNumber: string) => {
+    const parts = cardNumber.split(' ')
+    if (parts.length === 4) {
+      return `•••• •••• •••• ${parts[3]}`
+    }
+    return cardNumber
   }
 
   // Don't render anything if user is not logged in (will redirect)
@@ -436,6 +816,56 @@ export default function ProfilePage() {
                   </motion.div>
                 )}
                 
+                {/* Payment Section - Display after the teams section */}
+                {unpaidCompetitions.length > 0 && (
+                  <section className="mb-8">
+                    <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-6">
+                      <h2 className="text-xl font-semibold mb-4 flex items-center">
+                        <FaBell className="mr-2 text-yellow-500" /> Необходимо оплатить участие
+                      </h2>
+                      
+                      <div className="space-y-4">
+                        {unpaidCompetitions.map(competition => {
+                          // Find user's teams that are participating in this competition
+                          const teamsInCompetition = userTeams.filter(team => 
+                            competition.teams && competition.teams.includes(team.id)
+                          )
+                          
+                          return teamsInCompetition.map(team => (
+                            <div 
+                              key={`${competition.id}-${team.id}`} 
+                              className="bg-white rounded-lg p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between"
+                            >
+                              <div>
+                                <h3 className="font-medium text-gray-800">{competition.title}</h3>
+                                <p className="text-sm text-gray-600 mb-2">
+                                  Команда: <span className="font-medium">{team.name}</span>
+                                </p>
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <FaCalendarAlt className="mr-1" />
+                                  <span>{formatDate(competition.startDate)}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="mt-3 md:mt-0 flex items-center">
+                                <div className="mr-4 text-yellow-600 font-semibold">
+                                  {competition.entryFee?.toLocaleString()} ₸
+                                </div>
+                                <button 
+                                  className="btn-primary py-1.5 px-4 text-sm"
+                                  onClick={() => handlePayment(competition, team)}
+                                >
+                                  Оплатить
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        })}
+                      </div>
+                    </div>
+                  </section>
+                )}
+                
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -626,9 +1056,325 @@ export default function ProfilePage() {
                 </motion.div>
               </div>
             </div>
+            
+            {/* Payment Cards Section */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="max-w-6xl mx-auto mt-8"
+            >
+              <div className="card p-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold flex items-center">
+                    <FaCreditCard className="mr-3" style={{ color: 'var(--color-primary-500)' }} /> Платежные карты
+                  </h2>
+                  <button 
+                    onClick={() => setShowAddCardModal(true)}
+                    className="btn-outline-primary flex items-center"
+                  >
+                    <FaPlus className="mr-2" /> Добавить карту
+                  </button>
+                </div>
+                
+                {paymentCards.length > 0 ? (
+                  <div className="space-y-4">
+                    {paymentCards.map(card => (
+                      <div 
+                        key={card.id} 
+                        className="border rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between hover:shadow-md transition-all duration-300"
+                        style={{ borderColor: card.isDefault ? 'var(--color-primary-300)' : 'var(--color-border)', 
+                                 backgroundColor: card.isDefault ? 'var(--color-primary-50)' : 'transparent' }}
+                      >
+                        <div className="flex items-center">
+                          <FaCreditCard className="text-lg mr-3" style={{ color: 'var(--color-primary-500)' }} />
+                          <div>
+                            <div className="flex items-center">
+                              <p className="font-medium">{maskCardNumber(card.cardNumber)}</p>
+                              {card.isDefault && (
+                                <span className="ml-2 text-xs bg-primary-100 text-primary-700 py-0.5 px-2 rounded-full flex items-center">
+                                  <FaStar className="mr-1" size={10} /> По умолчанию
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600">{card.cardholderName}</p>
+                            <p className="text-sm text-gray-600">Действует до: {card.expiryDate}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3 md:mt-0 flex items-center">
+                          {!card.isDefault && (
+                            <button 
+                              onClick={() => setDefaultCard(card.id)} 
+                              className="text-sm text-primary-600 hover:text-primary-800 mr-4"
+                            >
+                              Сделать основной
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => removePaymentCard(card.id)} 
+                            className="text-sm text-red-600 hover:text-red-800 flex items-center"
+                          >
+                            <FaTrash className="mr-1" size={12} /> Удалить
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <FaCreditCard className="mx-auto text-3xl mb-3 text-gray-400" />
+                    <p className="text-gray-600 mb-4">У вас нет сохраненных платежных карт</p>
+                    <button 
+                      onClick={() => setShowAddCardModal(true)}
+                      className="btn-primary inline-flex items-center"
+                    >
+                      <FaPlus className="mr-2" /> Добавить карту
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </div>
         </div>
       </main>
+      
+      {/* Payment Modal */}
+      {showPaymentModal && selectedCompetition && selectedTeam && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-4">Оплата участия</h3>
+            <p className="mb-4">
+              Оплата участия команды <strong>{selectedTeam.name}</strong> в соревновании <strong>{selectedCompetition.title}</strong>:
+            </p>
+            <div className="bg-yellow-50 p-4 rounded-lg mb-4">
+              <p className="font-bold text-center text-xl text-yellow-700">
+                {selectedCompetition.entryFee?.toLocaleString()} ₸
+              </p>
+            </div>
+            
+            {/* Show saved cards if available */}
+            {paymentCards.length > 0 ? (
+              <div className="mb-4">
+                <h4 className="font-medium mb-2">Выберите сохраненную карту:</h4>
+                <div className="space-y-3">
+                  {paymentCards.map(card => (
+                    <div key={card.id} className="border rounded-md p-3 flex cursor-pointer hover:bg-gray-50">
+                      <input 
+                        type="radio" 
+                        name="savedCard" 
+                        id={`card-${card.id}`} 
+                        defaultChecked={card.isDefault}
+                        className="mr-3"
+                      />
+                      <label htmlFor={`card-${card.id}`} className="flex-grow cursor-pointer">
+                        <div className="flex items-center">
+                          <FaCreditCard className="mr-2 text-primary-500" />
+                          <span className="font-medium">{maskCardNumber(card.cardNumber)}</span>
+                          {card.isDefault && (
+                            <span className="ml-2 text-xs bg-primary-100 text-primary-700 py-0.5 px-1 rounded-full">
+                              По умолчанию
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          {card.cardholderName} • Истекает: {card.expiryDate}
+                        </div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-medium mb-2">
+                    Номер карты
+                  </label>
+                  <input 
+                    type="text" 
+                    className="input"
+                    placeholder="0000 0000 0000 0000"
+                    maxLength={19}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Срок действия
+                    </label>
+                    <input 
+                      type="text" 
+                      className="input"
+                      placeholder="MM/YY"
+                      maxLength={5}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      CVV
+                    </label>
+                    <input 
+                      type="text" 
+                      className="input"
+                      placeholder="123"
+                      maxLength={3}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                className="btn-outline py-2 px-4"
+                onClick={() => {
+                  setShowPaymentModal(false)
+                  setSelectedCompetition(null)
+                  setSelectedTeam(null)
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                className="btn-primary py-2 px-4"
+                onClick={processPayment}
+              >
+                Оплатить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Add Payment Card Modal */}
+      {showAddCardModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-4">Добавление платежной карты</h3>
+            
+            {cardErrors.general && (
+              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md flex items-center">
+                <FaExclamationTriangle className="mr-2" />
+                {cardErrors.general}
+              </div>
+            )}
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-medium mb-2">
+                Номер карты <span className="text-red-500">*</span>
+              </label>
+              <input 
+                type="text" 
+                name="cardNumber"
+                value={newCardData.cardNumber}
+                onChange={handleCardInputChange}
+                className={`input ${cardErrors.cardNumber ? 'border-red-500' : ''}`}
+                placeholder="0000 0000 0000 0000"
+                maxLength={19}
+              />
+              {cardErrors.cardNumber && (
+                <p className="text-red-500 text-xs mt-1 flex items-center">
+                  <FaExclamationTriangle className="mr-1" />
+                  {cardErrors.cardNumber}
+                </p>
+              )}
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-medium mb-2">
+                Имя владельца карты <span className="text-red-500">*</span>
+              </label>
+              <input 
+                type="text" 
+                name="cardholderName"
+                value={newCardData.cardholderName}
+                onChange={handleCardInputChange}
+                className={`input ${cardErrors.cardholderName ? 'border-red-500' : ''}`}
+                placeholder="IVAN IVANOV"
+              />
+              {cardErrors.cardholderName && (
+                <p className="text-red-500 text-xs mt-1 flex items-center">
+                  <FaExclamationTriangle className="mr-1" />
+                  {cardErrors.cardholderName}
+                </p>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  Срок действия <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  name="expiryDate"
+                  value={newCardData.expiryDate}
+                  onChange={handleCardInputChange}
+                  className={`input ${cardErrors.expiryDate ? 'border-red-500' : ''}`}
+                  placeholder="MM/YY"
+                  maxLength={5}
+                />
+                {cardErrors.expiryDate && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center">
+                    <FaExclamationTriangle className="mr-1" />
+                    {cardErrors.expiryDate}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  CVV <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  name="cvv"
+                  value={newCardData.cvv}
+                  onChange={handleCardInputChange}
+                  className={`input ${cardErrors.cvv ? 'border-red-500' : ''}`}
+                  placeholder="123"
+                  maxLength={3}
+                />
+                {cardErrors.cvv && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center">
+                    <FaExclamationTriangle className="mr-1" />
+                    {cardErrors.cvv}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                className="btn-outline py-2 px-4"
+                onClick={() => {
+                  setShowAddCardModal(false)
+                  setNewCardData({
+                    cardNumber: '',
+                    expiryDate: '',
+                    cvv: '',
+                    cardholderName: ''
+                  })
+                  setCardErrors({
+                    cardNumber: '',
+                    expiryDate: '',
+                    cvv: '',
+                    cardholderName: '',
+                    general: ''
+                  })
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                className="btn-primary py-2 px-4"
+                onClick={addPaymentCard}
+              >
+                Добавить карту
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <Footer />
     </div>

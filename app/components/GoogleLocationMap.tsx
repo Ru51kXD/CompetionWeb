@@ -6,7 +6,7 @@ import { useMapsLoaded } from './MapsProvider'
 
 const mapContainerStyle = {
   width: '100%',
-  height: '300px',
+  height: '400px',
   borderRadius: '8px',
 }
 

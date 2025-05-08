@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import Navbar from '../../components/Navbar'
 import Footer from '../../components/Footer'
-import { FaCalendarAlt, FaMapMarkerAlt, FaClock, FaUsers, FaClipboardList, FaUserPlus, FaTrophy, FaArrowLeft, FaEdit, FaPlus, FaInfoCircle, FaExclamationTriangle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa'
+import { FaCalendarAlt, FaMapMarkerAlt, FaClock, FaUsers, FaClipboardList, FaUserPlus, FaTrophy, FaArrowLeft, FaEdit, FaPlus, FaInfoCircle, FaExclamationTriangle, FaCheckCircle, FaTimesCircle, FaCreditCard } from 'react-icons/fa'
 import { useAuth } from '../../context/AuthContext'
 import GoogleLocationMap from '../../components/GoogleLocationMap'
 
@@ -17,6 +17,7 @@ interface User {
   name: string;
   email?: string;
   avatar?: string;
+  paymentCards?: PaymentCard[];
 }
 
 interface TeamMember {
@@ -59,6 +60,17 @@ interface Competition {
   competitionType?: 'team' | 'individual';
   createdBy?: number;
   creatorName?: string;
+  prizePool?: number;
+  entryFee?: number;
+  paidTeams?: number[];
+}
+
+interface PaymentCard {
+  id: number;
+  cardNumber: string;
+  expiryDate: string;
+  cardholderName: string;
+  isDefault: boolean;
 }
 
 // Mock data for competitions (same as on the listing page)
@@ -214,6 +226,18 @@ const formatTime = (date: Date) => {
   })
 }
 
+// Utility function to safely convert Date objects to strings
+const safelyConvertDateToString = (date: any): string => {
+  if (date instanceof Date) {
+    return date.toISOString();
+  } else if (typeof date === 'string') {
+    return date;
+  } else {
+    // Fallback to current date if invalid
+    return new Date().toISOString();
+  }
+};
+
 export default function CompetitionDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -223,6 +247,7 @@ export default function CompetitionDetailPage() {
   const [allTeams, setAllTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [showTeamSelection, setShowTeamSelection] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState('')
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
@@ -231,7 +256,214 @@ export default function CompetitionDetailPage() {
   const [teamSizeError, setTeamSizeError] = useState('')
   const [isRegistering, setIsRegistering] = useState(false)
   const [registeredParticipants, setRegisteredParticipants] = useState<User[]>([])
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [teamToRegister, setTeamToRegister] = useState<Team | null>(null)
+  const [userTeam, setUserTeam] = useState<Team | null>(null)
+  const [useSavedCard, setUseSavedCard] = useState(true)
+  const [savedCard, setSavedCard] = useState<{number: string, expiry: string, cvv: string} | null>(null)
   const { user, isAdmin } = useAuth()
+
+  // State for payment processing
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [selectedSavedCard, setSelectedSavedCard] = useState<number | null>(null);
+  const [saveCardForFuture, setSaveCardForFuture] = useState(false);
+  const [newCardData, setNewCardData] = useState({
+    cardNumber: '',
+    expiryDate: '',
+    cvv: '',
+    cardholderName: ''
+  });
+
+  // Mask card number for display (only last 4 digits visible)
+  const maskCardNumber = (cardNumber: string) => {
+    const parts = cardNumber.split(' ');
+    if (parts.length === 4) {
+      return `•••• •••• •••• ${parts[3]}`;
+    }
+    return cardNumber;
+  };
+
+  // Format card number with spaces for display (1234 5678 9012 3456)
+  const formatCardNumber = (cardNumber: string) => {
+    const cleaned = cardNumber.replace(/\s+/g, '');
+    const groups = cleaned.match(/.{1,4}/g);
+    return groups ? groups.join(' ') : cleaned;
+  };
+
+  // Handle card input changes with formatting
+  const handleCardInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    let formattedValue = value;
+
+    // Format card number with spaces after every 4 digits
+    if (name === 'cardNumber') {
+      // Remove any non-digit characters
+      const digits = value.replace(/\D/g, '');
+      // Format with spaces
+      if (digits.length > 0) {
+        const groups = digits.match(/.{1,4}/g);
+        formattedValue = groups ? groups.join(' ') : digits;
+      } else {
+        formattedValue = '';
+      }
+    }
+
+    // Format expiry date as MM/YY
+    if (name === 'expiryDate') {
+      // Remove any non-digit characters
+      const digits = value.replace(/\D/g, '');
+      
+      if (digits.length > 0) {
+        if (digits.length <= 2) {
+          formattedValue = digits;
+        } else {
+          formattedValue = `${digits.substring(0, 2)}/${digits.substring(2, 4)}`;
+        }
+      } else {
+        formattedValue = '';
+      }
+    }
+
+    // Only allow numbers for CVV
+    if (name === 'cvv') {
+      formattedValue = value.replace(/\D/g, '');
+    }
+    
+    setNewCardData(prev => ({
+      ...prev,
+      [name]: formattedValue
+    }));
+  };
+
+  // Process payment with selected or new card
+  const processPayment = () => {
+    if (!teamToRegister || !competition) return;
+    
+    // Validate if using new card
+    if (!selectedSavedCard && !useSavedCard) {
+      // Very basic validation
+      if (!newCardData.cardNumber || !newCardData.expiryDate || !newCardData.cvv || !newCardData.cardholderName) {
+        setError('Пожалуйста, заполните все данные карты');
+        return;
+      }
+      
+      // Basic format validation
+      const cardNumberClean = newCardData.cardNumber.replace(/\s/g, '');
+      if (cardNumberClean.length !== 16 || !/^\d+$/.test(cardNumberClean)) {
+        setError('Неверный формат номера карты');
+        return;
+      }
+      
+      if (!/^\d{2}\/\d{2}$/.test(newCardData.expiryDate)) {
+        setError('Неверный формат срока действия (ММ/ГГ)');
+        return;
+      }
+      
+      if (newCardData.cvv.length !== 3 || !/^\d{3}$/.test(newCardData.cvv)) {
+        setError('CVV должен содержать 3 цифры');
+        return;
+      }
+    }
+    
+    setPaymentInProgress(true);
+    setError('');
+
+    // Simulate payment processing delay
+    setTimeout(() => {
+      try {
+        // Get the latest competition data
+        const storedCompetitions = localStorage.getItem('competitions');
+        if (storedCompetitions && competition) {
+          const allCompetitions = JSON.parse(storedCompetitions);
+          const competitionIndex = allCompetitions.findIndex(c => c.id === competition.id);
+          
+          if (competitionIndex !== -1) {
+            // Process team registration
+            const teamId = teamToRegister.id;
+            
+            // Create paidTeams array if it doesn't exist
+            if (!allCompetitions[competitionIndex].paidTeams) {
+              allCompetitions[competitionIndex].paidTeams = [];
+            }
+            
+            // Add to paid teams
+            allCompetitions[competitionIndex].paidTeams.push(teamId);
+            
+            // Register the team
+            registerTeam(teamId, allCompetitions, competitionIndex, teamToRegister);
+            
+            // Add success message
+            const successMsg = `Оплата успешно произведена. Команда ${teamToRegister.name} зарегистрирована на соревнование!`;
+            setSuccessMessage(successMsg);
+            
+            // Clear success message after 5 seconds
+            setTimeout(() => {
+              setSuccessMessage('');
+            }, 5000);
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка при обработке оплаты:', error);
+        setError('Произошла ошибка при обработке оплаты');
+      } finally {
+        setPaymentInProgress(false);
+        setShowPaymentModal(false);
+        setTeamToRegister(null);
+        setSelectedSavedCard(null);
+        setSaveCardForFuture(false);
+        setNewCardData({
+          cardNumber: '',
+          expiryDate: '',
+          cvv: '',
+          cardholderName: ''
+        });
+      }
+    }, 1500);
+  };
+
+  // Add this useEffect to check for saved cards when the component loads
+  useEffect(() => {
+    // Check if user has saved card data in profile or local storage
+    if (user && user.id) {
+      console.log("Checking for saved card data for user:", user.id);
+      
+      // Check userCards in localStorage first
+      const userCards = localStorage.getItem('userCards');
+      if (userCards) {
+        try {
+          const cards = JSON.parse(userCards);
+          const userCard = cards.find(card => card.userId === user.id);
+          if (userCard) {
+            console.log("Found saved card in localStorage");
+            setSavedCard({
+              number: userCard.cardNumber,
+              expiry: userCard.expiry,
+              cvv: userCard.cvv
+            });
+          }
+        } catch (e) {
+          console.error("Error parsing userCards from localStorage:", e);
+        }
+      }
+      
+      // Also check user.paymentCards as a backup
+      if (user.paymentCards && user.paymentCards.length > 0) {
+        console.log("Found payment cards in user profile:", user.paymentCards.length);
+        
+        // Get default or first card
+        const defaultCard = user.paymentCards.find(card => card.isDefault) || user.paymentCards[0];
+        
+        if (defaultCard) {
+          console.log("Using card from profile:", defaultCard.id);
+          setSavedCard({
+            number: defaultCard.cardNumber,
+            expiry: defaultCard.expiryDate,
+            cvv: "***" // We don't typically store CVV in profiles
+          });
+        }
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchCompetition = async () => {
@@ -247,9 +479,25 @@ export default function CompetitionDetailPage() {
           
           // Find competition with matching id
           const competitionId = typeof id === 'string' ? parseInt(id, 10) : id
-          const foundCompetition = allCompetitions.find(c => c.id === competitionId)
+          console.log('Ищем соревнование с ID:', competitionId, 'Тип:', typeof competitionId)
+          console.log('Доступные соревнования:', allCompetitions.map(c => ({id: c.id, title: c.title, idType: typeof c.id})))
+          
+          // Try to find by numeric id first
+          let foundCompetition = allCompetitions.find(c => c.id === competitionId)
+          
+          // If not found, try string comparison as fallback
+          if (!foundCompetition && typeof id === 'string') {
+            foundCompetition = allCompetitions.find(c => String(c.id) === id)
+          }
+          
+          // If still not found, try looking by array index in case IDs are mismatched
+          if (!foundCompetition && typeof competitionId === 'number' && competitionId > 0 && competitionId <= allCompetitions.length) {
+            console.log('Пытаемся найти по индексу массива:', competitionId - 1)
+            foundCompetition = allCompetitions[competitionId - 1]
+          }
           
           if (foundCompetition) {
+            console.log('Соревнование найдено:', foundCompetition)
             // Ensure maxTeams and maxTeamSize are set
             if (!foundCompetition.maxTeams) {
               foundCompetition.maxTeams = 10; // Default value
@@ -257,6 +505,28 @@ export default function CompetitionDetailPage() {
             
             if (!foundCompetition.maxTeamSize) {
               foundCompetition.maxTeamSize = 10; // Default value
+            }
+            
+            // Проверяем, есть ли координаты, и если нет - добавляем случайные для Астаны
+            if (!foundCompetition.coordinates || foundCompetition.coordinates.length !== 2) {
+              const astanaCoordinates = [
+                [71.428152, 51.089079], // Астана Арена
+                [71.429680, 51.142890], // Центральный стадион
+                [71.415234, 51.122356], // Стадион Мунайтпасова
+                [71.431567, 51.127890], // Спорткомплекс Казахстан
+              ]
+              const randomIndex = Math.floor(Math.random() * astanaCoordinates.length)
+              foundCompetition.coordinates = astanaCoordinates[randomIndex]
+              foundCompetition.city = "Астана"
+              foundCompetition.country = "Казахстан"
+              
+              // Сохраняем обратно в localStorage
+              const updatedCompetitions = [...allCompetitions]
+              const competitionIndex = updatedCompetitions.findIndex(c => c.id === foundCompetition.id)
+              if (competitionIndex !== -1) {
+                updatedCompetitions[competitionIndex] = foundCompetition
+                localStorage.setItem('competitions', JSON.stringify(updatedCompetitions))
+              }
             }
             
             setCompetition(foundCompetition)
@@ -293,10 +563,61 @@ export default function CompetitionDetailPage() {
               setRegisteredParticipants(participants)
             }
           } else {
+            console.error('Соревнование не найдено в базе данных. ID:', competitionId)
             setError('Соревнование не найдено')
+            
+            // Альтернативный вариант - загрузить данные из мок-данных
+            const mockCompetition = mockCompetitions.find(c => c.id === competitionId || String(c.id) === id)
+            if (mockCompetition) {
+              console.log('Найдено в mocked данных:', mockCompetition)
+              // Добавим координаты в Астане и конвертируем даты в строки
+              const mockWithCoordinates: Competition = {
+                ...mockCompetition,
+                coordinates: [71.428152, 51.089079] as [number, number], // Астана Арена
+                city: "Астана",
+                country: "Казахстан",
+                maxTeams: 10,
+                maxTeamSize: 10,
+                status: 'upcoming',
+                startDate: safelyConvertDateToString(mockCompetition.startDate),
+                endDate: safelyConvertDateToString(mockCompetition.endDate)
+              }
+              setCompetition(mockWithCoordinates)
+              setError('') // Сбросим ошибку, так как нашли соревнование в мок-данных
+              
+              // Сохраним это соревнование в localStorage
+              const competitionsToSave = storedCompetitions ? JSON.parse(storedCompetitions) : []
+              competitionsToSave.push(mockWithCoordinates)
+              localStorage.setItem('competitions', JSON.stringify(competitionsToSave))
+            }
           }
         } else {
+          console.error('Соревнования не найдены в localStorage')
           setError('Соревнования не найдены')
+          
+          // Инициализируем localStorage мок-данными
+          const competitionsWithCoordinates = mockCompetitions.map(comp => {
+            return {
+              ...comp,
+              coordinates: [71.428152, 51.089079] as [number, number], // Астана Арена
+              city: "Астана",
+              country: "Казахстан",
+              maxTeams: 10,
+              maxTeamSize: 10,
+              status: 'upcoming' as 'upcoming',
+              startDate: safelyConvertDateToString(comp.startDate),
+              endDate: safelyConvertDateToString(comp.endDate)
+            }
+          })
+          localStorage.setItem('competitions', JSON.stringify(competitionsWithCoordinates))
+          
+          // Если ID соответствует одному из мок-соревнований, установим его
+          const competitionId = typeof id === 'string' ? parseInt(id, 10) : id
+          const mockCompetition = competitionsWithCoordinates.find(c => c.id === competitionId || String(c.id) === id)
+          if (mockCompetition) {
+            setCompetition(mockCompetition)
+            setError('') // Сбросим ошибку, так как нашли соревнование в мок-данных
+          }
         }
       } catch (err) {
         console.error('Ошибка при загрузке соревнования:', err)
@@ -309,145 +630,201 @@ export default function CompetitionDetailPage() {
     fetchCompetition()
   }, [id, user])
 
+  // Update userTeam when userTeams changes or competition is loaded
+  useEffect(() => {
+    if (user && competition && userTeams.length > 0) {
+      // Find the user's team that is registered for this competition
+      const registeredTeam = userTeams.find(team => 
+        competition.teams?.includes(team.id)
+      );
+      setUserTeam(registeredTeam || null);
+    }
+  }, [user, competition, userTeams]);
+
   const handleAddTeam = () => {
-    if (!selectedTeam) return
+    if (!user) {
+      router.push('/login')
+      return
+    }
     
     setIsRegistering(true)
-    setTeamSizeError('')
     
     try {
-      // Get all competitions and teams from localStorage
-      const storedCompetitions = localStorage.getItem('competitions')
+      // Get teams from localStorage
       const storedTeams = localStorage.getItem('teams')
-      
-      if (storedCompetitions && storedTeams) {
-        const competitions = JSON.parse(storedCompetitions)
-        const teams = JSON.parse(storedTeams)
+      if (storedTeams) {
+        const allTeams = JSON.parse(storedTeams)
         
-        // Find competition to update
-        const competitionId = typeof id === 'string' ? parseInt(id, 10) : id
-        const competitionIndex = competitions.findIndex(c => c.id === competitionId)
+        // Filter teams owned by current user
+        const userOwnedTeams = allTeams.filter(team => team.ownerId === user.id)
         
-        // Find selected team
-        const teamId = parseInt(selectedTeam, 10)
-        const team = teams.find(t => t.id === teamId)
-        
-        if (competitionIndex !== -1 && team) {
-          // Check if the competition has reached max teams
-          if (competitions[competitionIndex].teams && 
-              competitions[competitionIndex].teams.length >= competitions[competitionIndex].maxTeams) {
-            setTeamSizeError(`Достигнут лимит команд (${competitions[competitionIndex].maxTeams}) для этого соревнования`)
-            setIsRegistering(false)
-            return
+        if (userOwnedTeams.length === 0) {
+          // If user has no teams, redirect to create team page
+          setError('У вас нет команд для регистрации. Создайте команду сначала.')
+          setIsRegistering(false)
+          
+          // Show confirm dialog
+          if (confirm('У вас нет команд для регистрации. Создать команду?')) {
+            router.push('/teams/create')
           }
-          
-          // Check if the team meets the size requirements
-          if (team.members && team.members.length > competitions[competitionIndex].maxTeamSize) {
-            setTeamSizeError(`В команде слишком много участников. Максимально допустимый размер команды: ${competitions[competitionIndex].maxTeamSize}`)
-            setIsRegistering(false)
-            return
-          }
-          
-          // Check if the team is already registered
-          if (competitions[competitionIndex].teams && 
-              competitions[competitionIndex].teams.includes(teamId)) {
-            setTeamSizeError('Эта команда уже зарегистрирована в соревновании')
-            setIsRegistering(false)
-            return
-          }
-          
-          // Add team to competition
-          if (!competitions[competitionIndex].teams) {
-            competitions[competitionIndex].teams = []
-          }
-          
-          competitions[competitionIndex].teams.push(teamId)
-          competitions[competitionIndex].participantCount = competitions[competitionIndex].teams.length
-          
-          // Update competition in localStorage
-          localStorage.setItem('competitions', JSON.stringify(competitions))
-          
-          // Update team's competition count
-          const teamIndex = teams.findIndex(t => t.id === teamId)
-          if (teamIndex !== -1) {
-            teams[teamIndex] = {
-              ...teams[teamIndex],
-              competitionCount: (teams[teamIndex].competitionCount || 0) + 1
-            }
-            
-            // Save team back to localStorage
-            localStorage.setItem('teams', JSON.stringify(teams))
-          }
-          
-          // Update state
-          setCompetition(competitions[competitionIndex])
-          setParticipatingTeams([...participatingTeams, team])
-          setRegistrationSuccess(true)
-          setRegisteredTeamName(team.name)
-          setShowTeamSelection(false)
-          
-          setTimeout(() => {
-            setRegistrationSuccess(false)
-            setIsRegistering(false)
-          }, 3000)
+          return
         }
+        
+        setUserTeams(userOwnedTeams)
+        setShowTeamSelection(true)
       }
+      
+      setIsRegistering(false)
     } catch (error) {
-      console.error('Ошибка при регистрации команды:', error)
+      console.error('Ошибка при загрузке команд:', error)
+      setError('Произошла ошибка при загрузке команд')
       setIsRegistering(false)
     }
   }
 
-  const handleIndividualRegistration = () => {
-    if (!user || !competition) return;
-
-    setIsRegistering(true);
-    setError('');
-
+  const handleTeamSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const teamId = parseInt(e.target.value, 10)
+    setSelectedTeam(e.target.value)
+    
+    if (!teamId || !competition) return
+    
     try {
-      // Получаем соревнования из localStorage
-      const storedCompetitions = localStorage.getItem('competitions');
-      const storedUsers = localStorage.getItem('users');
+      // Get competitions and teams from localStorage
+      const storedCompetitions = localStorage.getItem('competitions')
+      const storedTeams = localStorage.getItem('teams')
       
-      if (storedCompetitions && storedUsers) {
-        const competitions = JSON.parse(storedCompetitions);
-        const users = JSON.parse(storedUsers);
+      if (storedCompetitions && storedTeams) {
+        const allCompetitions = JSON.parse(storedCompetitions)
+        const allTeams = JSON.parse(storedTeams)
         
-        const competitionId = typeof id === 'string' ? parseInt(id, 10) : id;
-        const competitionIndex = competitions.findIndex((c: any) => c.id === competitionId);
-
-        if (competitionIndex !== -1) {
-          // Проверяем, не зарегистрирован ли уже пользователь
-          if (!competitions[competitionIndex].participants) {
-            competitions[competitionIndex].participants = [];
+        // Find team and competition
+        const team = allTeams.find(t => t.id === teamId)
+        const competitionIndex = allCompetitions.findIndex(c => c.id === competition.id)
+        
+        if (competitionIndex !== -1 && team) {
+          // Set the userTeam when a team is selected
+          setUserTeam(team);
+          
+          // Check if team members exceed max team size
+          if (team.memberCount && team.memberCount > competition.maxTeamSize) {
+            setTeamSizeError(`В команде слишком много участников. Максимальный размер команды: ${competition.maxTeamSize}`)
+            return
           }
           
-          if (competitions[competitionIndex].participants.includes(user.id)) {
-            setError('Вы уже зарегистрированы на это соревнование');
-            setIsRegistering(false);
-            return;
+          setTeamSizeError('')
+          setTeamToRegister(team)
+          
+          // Always show payment modal if competition has an entry fee
+          if (competition.entryFee && competition.entryFee > 0) {
+            // Auto-use saved card if available
+            if (savedCard) {
+              console.log("Using previously loaded saved card");
+              setUseSavedCard(true);
+            } else {
+              // One more check for saved cards
+              console.log("No saved card found, checking again...");
+              if (user && user.id) {
+                // Check userCards in localStorage
+                const userCards = localStorage.getItem('userCards');
+                if (userCards) {
+                  try {
+                    const cards = JSON.parse(userCards);
+                    const userCard = cards.find(card => card.userId === user.id);
+                    if (userCard) {
+                      console.log("Found saved card in localStorage during team select");
+                      setSavedCard({
+                        number: userCard.cardNumber,
+                        expiry: userCard.expiry,
+                        cvv: userCard.cvv
+                      });
+                      setUseSavedCard(true);
+                    }
+                  } catch (e) {
+                    console.error("Error parsing userCards:", e);
+                  }
+                }
+                
+                // Also check user.paymentCards
+                if (user.paymentCards && user.paymentCards.length > 0) {
+                  console.log("Found payment cards in user profile during team select");
+                  
+                  // Get default or first card
+                  const defaultCard = user.paymentCards.find(card => card.isDefault) || user.paymentCards[0];
+                  
+                  if (defaultCard) {
+                    console.log("Using card from profile during team select:", defaultCard.id);
+                    setSavedCard({
+                      number: defaultCard.cardNumber,
+                      expiry: defaultCard.expiryDate,
+                      cvv: "***" // We don't typically store CVV in profiles
+                    });
+                    setUseSavedCard(true);
+                  }
+                }
+              }
+            }
+            
+            setShowPaymentModal(true);
+          } else {
+            // Only register if no fee is required
+            registerTeam(teamId, allCompetitions, competitionIndex, team)
           }
-          
-          // Добавляем пользователя
-          competitions[competitionIndex].participants.push(user.id);
-          competitions[competitionIndex].participantCount = competitions[competitionIndex].participants.length;
-          localStorage.setItem('competitions', JSON.stringify(competitions));
-          
-          // Обновляем список участников
-          const currentUser = users.find((u: any) => u.id === user.id) as User;
-          if (currentUser) {
-            setRegisteredParticipants([...registeredParticipants, currentUser]);
-          }
-          
-          setRegistrationSuccess(true);
         }
       }
-    } catch (err) {
-      setError('Ошибка при регистрации');
-    } finally {
-      setIsRegistering(false);
+    } catch (error) {
+      console.error('Ошибка при выборе команды:', error)
+      setError('Произошла ошибка при выборе команды')
     }
-  };
+  }
+  
+  const registerTeam = (teamId: number, allCompetitions: any[], competitionIndex: number, team: any) => {
+    // If competition allows more registrations
+    if (!allCompetitions[competitionIndex].teams) {
+      allCompetitions[competitionIndex].teams = []
+    }
+    
+    // Check if team is already registered
+    if (allCompetitions[competitionIndex].teams.includes(teamId)) {
+      setError('Эта команда уже зарегистрирована на соревнование')
+      return
+    }
+    
+    // Check if max teams reached
+    if (allCompetitions[competitionIndex].teams.length >= (competition?.maxTeams || 10)) {
+      setError('Достигнуто максимальное количество команд')
+      return
+    }
+    
+    // Add team to competition
+    allCompetitions[competitionIndex].teams.push(teamId)
+    
+    // Update participant count
+    allCompetitions[competitionIndex].participantCount = 
+      (allCompetitions[competitionIndex].participantCount || 0) + (team.memberCount || 1)
+    
+    // Save competitions
+    localStorage.setItem('competitions', JSON.stringify(allCompetitions))
+    
+    // Update team info with competition
+    const storedTeams = localStorage.getItem('teams')
+    if (storedTeams) {
+      const teams = JSON.parse(storedTeams)
+      const teamIndex = teams.findIndex(t => t.id === teamId)
+      if (teamIndex !== -1) {
+        teams[teamIndex].competitionCount = (teams[teamIndex].competitionCount || 0) + 1
+        localStorage.setItem('teams', JSON.stringify(teams))
+      }
+    }
+    
+    // Update competition and show success message
+    setCompetition(allCompetitions[competitionIndex])
+    setParticipatingTeams([...participatingTeams, team])
+    // Ensure userTeam is set after registration
+    setUserTeam(team);
+    setRegistrationSuccess(true)
+    setRegisteredTeamName(team.name)
+    setShowTeamSelection(false)
+  }
 
   const getStatusBadge = (status: string) => {
     let bgColor, textColor, label;
@@ -575,13 +952,83 @@ export default function CompetitionDetailPage() {
                 <div className="lg:col-span-2">
                   <div className="mb-8">
                     <h2 className="text-2xl font-bold mb-4">О соревновании</h2>
-                    <p className="text-gray-700 whitespace-pre-line">{competition.description}</p>
+                    <p className="text-gray-700 whitespace-pre-line leading-relaxed">{competition.description}</p>
+                    
+                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <h3 className="text-md font-semibold text-blue-800 mb-2 flex items-center">
+                          <FaCalendarAlt className="mr-2" /> Важные даты
+                        </h3>
+                        <ul className="space-y-2">
+                          <li className="flex items-start">
+                            <span className="text-blue-700 font-medium mr-2 flex-shrink-0">Начало:</span>
+                            <span className="text-gray-700">
+                              {new Date(competition.startDate).toLocaleDateString('ru-RU', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-blue-700 font-medium mr-2 flex-shrink-0">Завершение:</span>
+                            <span className="text-gray-700">
+                              {new Date(competition.endDate).toLocaleDateString('ru-RU', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="text-blue-700 font-medium mr-2 flex-shrink-0">Продолжительность:</span>
+                            <span className="text-gray-700">
+                              {Math.ceil((new Date(competition.endDate).getTime() - new Date(competition.startDate).getTime()) / (1000 * 60 * 60 * 24))} дней
+                            </span>
+                          </li>
+                        </ul>
+                      </div>
+                      
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <h3 className="text-md font-semibold text-green-800 mb-2 flex items-center">
+                          <FaUsers className="mr-2" /> Участие
+                        </h3>
+                        <ul className="space-y-2">
+                          <li className="flex items-start">
+                            <span className="text-green-700 font-medium mr-2">Тип соревнования:</span>
+                            <span className="text-gray-700">{competition.competitionType === 'team' ? 'Командное' : 'Индивидуальное'}</span>
+                          </li>
+                          {competition.competitionType === 'team' && (
+                            <>
+                              <li className="flex items-start">
+                                <span className="text-green-700 font-medium mr-2">Команд:</span>
+                                <span className="text-gray-700">{participatingTeams.length} из {competition.maxTeams}</span>
+                              </li>
+                              <li className="flex items-start">
+                                <span className="text-green-700 font-medium mr-2">Размер команды:</span>
+                                <span className="text-gray-700">до {competition.maxTeamSize} человек</span>
+                              </li>
+                            </>
+                          )}
+                          {competition.competitionType === 'individual' && (
+                            <li className="flex items-start">
+                              <span className="text-green-700 font-medium mr-2">Участников:</span>
+                              <span className="text-gray-700">{registeredParticipants.length}</span>
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                   
                   <div className="mb-8">
                     <h2 className="text-2xl font-bold mb-4">Правила</h2>
                     <div className="bg-gray-50 rounded-lg p-4">
-                      <pre className="whitespace-pre-line font-sans text-gray-700">{competition.rules || 'Правила не указаны'}</pre>
+                      <pre className="whitespace-pre-line font-sans text-gray-700 leading-relaxed">{competition.rules || 'Правила не указаны'}</pre>
                     </div>
                   </div>
                   
@@ -619,6 +1066,18 @@ export default function CompetitionDetailPage() {
                           <a href={`tel:${competition.contactPhone}`} className="text-primary-600 hover:underline">{competition.contactPhone}</a>
                         </li>
                       )}
+                      {competition.city && (
+                        <li className="flex items-start">
+                          <span className="text-gray-600 font-medium mr-2">Город:</span>
+                          <span>{competition.city}</span>
+                        </li>
+                      )}
+                      {competition.country && (
+                        <li className="flex items-start">
+                          <span className="text-gray-600 font-medium mr-2">Страна:</span>
+                          <span>{competition.country}</span>
+                        </li>
+                      )}
                       <li className="flex items-start">
                         <span className="text-gray-600 font-medium mr-2">Участники:</span>
                         <span>{competition.participantCount || 0} команд из {competition.maxTeams}</span>
@@ -627,19 +1086,33 @@ export default function CompetitionDetailPage() {
                         <span className="text-gray-600 font-medium mr-2">Размер команды:</span>
                         <span>до {competition.maxTeamSize} человек</span>
                       </li>
+                      {competition.prizePool !== undefined && competition.prizePool > 0 && (
+                        <li className="flex items-start">
+                          <span className="text-gray-600 font-medium mr-2">Призовой фонд:</span>
+                          <span className="font-bold text-green-600">{competition.prizePool.toLocaleString()} ₸</span>
+                        </li>
+                      )}
+                      {competition.entryFee !== undefined && competition.entryFee > 0 ? (
+                        <li className="flex items-start">
+                          <span className="text-gray-600 font-medium mr-2">Стоимость участия:</span>
+                          <span className="font-semibold text-yellow-600">{competition.entryFee.toLocaleString()} ₸</span>
+                          {user && userTeams.some(team => competition.teams?.includes(team.id)) && (
+                            <span className="ml-2 px-2 py-0.5 text-xs rounded bg-gray-200">
+                              {competition.paidTeams?.some(paidTeamId => 
+                                userTeams.some(team => team.id === paidTeamId)
+                              ) 
+                                ? "Оплачено" 
+                                : "Требуется оплата"}
+                            </span>
+                          )}
+                        </li>
+                      ) : (
+                        <li className="flex items-start">
+                          <span className="text-gray-600 font-medium mr-2">Стоимость участия:</span>
+                          <span className="text-green-600">Бесплатно</span>
+                        </li>
+                      )}
                     </ul>
-                    
-                    {/* Карта местоположения */}
-                    {competition.coordinates && competition.coordinates.length === 2 && (
-                      <div className="mt-4">
-                        <h4 className="font-medium mb-2">Местоположение:</h4>
-                        <GoogleLocationMap 
-                          address={competition.location}
-                          coordinates={competition.coordinates}
-                          title={competition.title}
-                        />
-                      </div>
-                    )}
                   </div>
                   
                   {/* --- Блок для командных соревнований --- */}
@@ -701,6 +1174,11 @@ export default function CompetitionDetailPage() {
                           ) : (
                             <>
                               <FaUserPlus className="mr-2" /> Зарегистрировать команду
+                              {competition.entryFee && competition.entryFee > 0 && (
+                                <span className="ml-2 px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded">
+                                  Платно: {competition.entryFee.toLocaleString()} ₸
+                                </span>
+                              )}
                             </>
                           )}
                         </button>
@@ -708,11 +1186,16 @@ export default function CompetitionDetailPage() {
                       {showTeamSelection && (
                         <div className="mt-4 border border-gray-200 rounded-lg p-4">
                           <h4 className="font-medium mb-3">Выберите команду для регистрации:</h4>
+                          {competition.entryFee && competition.entryFee > 0 && (
+                            <div className="mb-3 p-2 bg-yellow-50 text-yellow-800 text-sm rounded border border-yellow-200">
+                              <FaInfoCircle className="inline-block mr-1" /> Регистрация команды требует оплаты взноса в размере {competition.entryFee.toLocaleString()} ₸
+                            </div>
+                          )}
                           {userTeams.length > 0 ? (
                             <>
                               <select
                                 value={selectedTeam}
-                                onChange={(e) => setSelectedTeam(e.target.value)}
+                                onChange={handleTeamSelect}
                                 className="input mb-3 w-full"
                               >
                                 <option value="">-- Выберите команду --</option>
@@ -741,7 +1224,10 @@ export default function CompetitionDetailPage() {
                                     </>
                                   ) : (
                                     <>
-                                      <FaUserPlus className="mr-2" /> Зарегистрировать
+                                      <FaUserPlus className="mr-2" /> 
+                                      {competition.entryFee && competition.entryFee > 0 
+                                        ? "Продолжить к оплате" 
+                                        : "Зарегистрировать"}
                                     </>
                                   )}
                                 </button>
@@ -825,7 +1311,7 @@ export default function CompetitionDetailPage() {
                         </div>
                       ) : (
                         <button
-                          onClick={handleIndividualRegistration}
+                          onClick={handleAddTeam}
                           disabled={isRegistering}
                           className="w-full btn-primary flex items-center justify-center"
                         >
@@ -837,10 +1323,289 @@ export default function CompetitionDetailPage() {
                   )}
                 </div>
               </div>
+              
+              {/* Карта соревнования - крупная, снизу */}
+              {competition.coordinates && competition.coordinates.length === 2 && (
+                <div className="mt-10 border-t border-gray-200 pt-8">
+                  <h2 className="text-2xl font-bold mb-4 flex items-center">
+                    <FaMapMarkerAlt className="mr-2 text-primary-600" /> Место проведения соревнования
+                  </h2>
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-gray-200">
+                      <h3 className="font-medium text-lg">{competition.location}</h3>
+                      {competition.city && competition.country && (
+                        <p className="text-gray-600">{competition.city}, {competition.country}</p>
+                      )}
+                    </div>
+                    <div className="h-[500px]">
+                      <GoogleLocationMap 
+                        address={competition.location}
+                        coordinates={competition.coordinates}
+                        title={competition.title}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </main>
+      
+      {/* Payment Modal */}
+      {showPaymentModal && teamToRegister && competition && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-4">Оплата участия</h3>
+            <p className="mb-4">
+              Для завершения регистрации команды <strong>{teamToRegister.name}</strong> необходимо оплатить взнос:
+            </p>
+            <div className="bg-yellow-50 p-4 rounded-lg mb-4">
+              <p className="font-bold text-center text-xl text-yellow-700">
+                {competition.entryFee?.toLocaleString()} ₸
+              </p>
+            </div>
+            
+            {savedCard ? (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-gray-700 text-sm font-medium">
+                    Способ оплаты
+                  </label>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="useSavedCard"
+                      checked={useSavedCard}
+                      onChange={() => setUseSavedCard(!useSavedCard)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="useSavedCard" className="text-sm">
+                      Использовать сохраненную карту
+                    </label>
+                  </div>
+                </div>
+                
+                {useSavedCard ? (
+                  <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Ваша карта</p>
+                        <p className="text-gray-600">**** **** **** {savedCard.number.slice(-4)}</p>
+                        <p className="text-xs text-gray-500">Срок действия: {savedCard.expiry}</p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <svg className="h-10 w-10 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="mb-4">
+                      <label className="block text-gray-700 text-sm font-medium mb-2">
+                        Номер карты
+                      </label>
+                      <input 
+                        type="text" 
+                        className="input w-full"
+                        placeholder="0000 0000 0000 0000"
+                        maxLength={19}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-gray-700 text-sm font-medium mb-2">
+                          Срок действия
+                        </label>
+                        <input 
+                          type="text" 
+                          className="input w-full"
+                          placeholder="MM/YY"
+                          maxLength={5}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-700 text-sm font-medium mb-2">
+                          CVV
+                        </label>
+                        <input 
+                          type="text" 
+                          className="input w-full"
+                          placeholder="123"
+                          maxLength={3}
+                        />
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="saveCard"
+                          className="mr-2"
+                        />
+                        <label htmlFor="saveCard" className="text-sm text-gray-700">
+                          Сохранить карту для будущих платежей
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-medium mb-2">
+                    Номер карты
+                  </label>
+                  <input 
+                    type="text" 
+                    className="input w-full"
+                    placeholder="0000 0000 0000 0000"
+                    maxLength={19}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Срок действия
+                    </label>
+                    <input 
+                      type="text" 
+                      className="input w-full"
+                      placeholder="MM/YY"
+                      maxLength={5}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      CVV
+                    </label>
+                    <input 
+                      type="text" 
+                      className="input w-full"
+                      placeholder="123"
+                      maxLength={3}
+                    />
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="saveCard"
+                      className="mr-2"
+                    />
+                    <label htmlFor="saveCard" className="text-sm text-gray-700">
+                      Сохранить карту для будущих платежей
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                className="btn-outline py-2 px-4"
+                onClick={() => {
+                  setShowPaymentModal(false)
+                  setTeamToRegister(null)
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                className="btn-primary py-2 px-4"
+                onClick={() => {
+                  // Add more logging to debug
+                  console.log("Processing payment with saved card:", savedCard);
+                  console.log("Using saved card:", useSavedCard);
+                  
+                  // Process payment
+                  setShowPaymentModal(false)
+                  
+                  // Get the latest competition data
+                  const storedCompetitions = localStorage.getItem('competitions')
+                  if (storedCompetitions && competition && teamToRegister) {
+                    const allCompetitions = JSON.parse(storedCompetitions)
+                    const competitionIndex = allCompetitions.findIndex(c => c.id === competition.id)
+                    
+                    if (competitionIndex !== -1) {
+                      // Process team registration
+                      const teamId = teamToRegister.id
+                      
+                      // Create paidTeams array if it doesn't exist
+                      if (!allCompetitions[competitionIndex].paidTeams) {
+                        allCompetitions[competitionIndex].paidTeams = []
+                      }
+                      
+                      // Add to paid teams
+                      allCompetitions[competitionIndex].paidTeams.push(teamId)
+                      
+                      // Register the team
+                      registerTeam(teamId, allCompetitions, competitionIndex, teamToRegister)
+                      
+                      // Success message
+                      setSuccessMessage(`Оплата успешно произведена. Команда ${teamToRegister.name} зарегистрирована на соревнование!`);
+                      setTimeout(() => {
+                        setSuccessMessage('');
+                      }, 5000);
+                      
+                      // Save the new card if user chose to save it
+                      if (!useSavedCard && user) {
+                        const cardNumberInput = document.querySelector('input[placeholder="0000 0000 0000 0000"]') as HTMLInputElement;
+                        const expiryInput = document.querySelector('input[placeholder="MM/YY"]') as HTMLInputElement;
+                        const cvvInput = document.querySelector('input[placeholder="123"]') as HTMLInputElement;
+                        const saveCardCheckbox = document.getElementById('saveCard') as HTMLInputElement;
+                        
+                        if (saveCardCheckbox?.checked && cardNumberInput && expiryInput && cvvInput) {
+                          const cardNumber = cardNumberInput.value;
+                          const expiry = expiryInput.value;
+                          const cvv = cvvInput.value;
+                          
+                          if (cardNumber && expiry && cvv) {
+                            // Save card to localStorage
+                            const userCards = localStorage.getItem('userCards');
+                            const cards = userCards ? JSON.parse(userCards) : [];
+                            
+                            // Check if user already has a card
+                            const userCardIndex = cards.findIndex(card => card.userId === user.id);
+                            
+                            if (userCardIndex !== -1) {
+                              // Update existing card
+                              cards[userCardIndex] = {
+                                userId: user.id,
+                                cardNumber,
+                                expiry,
+                                cvv
+                              };
+                            } else {
+                              // Add new card
+                              cards.push({
+                                userId: user.id,
+                                cardNumber,
+                                expiry,
+                                cvv
+                              });
+                            }
+                            
+                            localStorage.setItem('userCards', JSON.stringify(cards));
+                          }
+                        }
+                      }
+                    }
+                  }
+                  
+                  setTeamToRegister(null)
+                }}
+              >
+                Оплатить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <Footer />
     </div>

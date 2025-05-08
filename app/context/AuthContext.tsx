@@ -9,6 +9,17 @@ export type User = {
   name: string
   email: string
   role: 'user' | 'admin'
+  paymentCards?: PaymentCard[]
+}
+
+// Define payment card type
+export type PaymentCard = {
+  id: number
+  cardNumber: string
+  expiryDate: string
+  cvv?: string
+  cardholderName: string
+  isDefault?: boolean
 }
 
 // Define auth context type
