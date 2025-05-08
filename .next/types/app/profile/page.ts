@@ -1,4 +1,4 @@
-// File: C:\Users\ForWinkk\Desktop\CompetitionWeb\app\profile\page.tsx
+// File: C:\Users\ForWinkk\Desktop\CompetitionWebNew\CompetionWeb\app\profile\page.tsx
 import * as entry from '../../../../app/profile/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

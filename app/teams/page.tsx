@@ -119,6 +119,10 @@ const itemVariants = {
 export default function TeamsPage() {
   const [teams, setTeams] = useState(mockTeams)
   const [searchQuery, setSearchQuery] = useState('')
+  const [minMembers, setMinMembers] = useState('')
+  const [maxMembers, setMaxMembers] = useState('')
+  const [minCompetitions, setMinCompetitions] = useState('')
+  const [maxCompetitions, setMaxCompetitions] = useState('')
   const [isLoaded, setIsLoaded] = useState(false)
   
   useEffect(() => {
@@ -149,10 +153,13 @@ export default function TeamsPage() {
     }
   }, [])
 
-  // Filter teams based on search query
+  // Filter teams based on search query and filters
   const filteredTeams = teams.filter(team => {
-    return team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           team.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesQuery = team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      team.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const membersOk = (!minMembers || team.memberCount >= Number(minMembers)) && (!maxMembers || team.memberCount <= Number(maxMembers));
+    const competitionsOk = (!minCompetitions || team.competitionCount >= Number(minCompetitions)) && (!maxCompetitions || team.competitionCount <= Number(maxCompetitions));
+    return matchesQuery && membersOk && competitionsOk;
   })
 
   return (
@@ -173,7 +180,7 @@ export default function TeamsPage() {
             </p>
           </motion.div>
           
-          {/* Search */}
+          {/* Search & Filters */}
           <div className="mb-12">
             <div className="max-w-4xl mx-auto">
               <motion.div 
@@ -182,17 +189,63 @@ export default function TeamsPage() {
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="bg-white rounded-xl shadow-md p-4"
               >
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <FaSearch className="text-gray-400" />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                  <div className="relative col-span-1 md:col-span-2">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FaSearch className="text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Поиск команд..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="input pl-10 w-full"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Поиск команд..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input pl-10"
-                  />
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Участников от</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={minMembers}
+                      onChange={e => setMinMembers(e.target.value)}
+                      className="input w-full"
+                      placeholder="min"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Участников до</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={maxMembers}
+                      onChange={e => setMaxMembers(e.target.value)}
+                      className="input w-full"
+                      placeholder="max"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Соревнований от</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={minCompetitions}
+                      onChange={e => setMinCompetitions(e.target.value)}
+                      className="input w-full"
+                      placeholder="min"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Соревнований до</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={maxCompetitions}
+                      onChange={e => setMaxCompetitions(e.target.value)}
+                      className="input w-full"
+                      placeholder="max"
+                    />
+                  </div>
                 </div>
               </motion.div>
             </div>

@@ -1,5 +1,6 @@
 {
-  "/page": "app/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/profile/page": "app/profile/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/leaderboard/page": "app/leaderboard/page.js",
+  "/teams/page": "app/teams/page.js",
+  "/competitions/page": "app/competitions/page.js"
 }
