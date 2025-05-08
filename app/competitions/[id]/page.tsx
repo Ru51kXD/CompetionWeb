@@ -179,6 +179,7 @@ export default function CompetitionDetailPage() {
   const [userTeams, setUserTeams] = useState([])
   const [teamSizeError, setTeamSizeError] = useState('')
   const [isRegistering, setIsRegistering] = useState(false)
+  const [registeredParticipants, setRegisteredParticipants] = useState([])
   const { user, isAdmin } = useAuth()
 
   useEffect(() => {
@@ -188,6 +189,7 @@ export default function CompetitionDetailPage() {
         // Get competitions from localStorage
         const storedCompetitions = localStorage.getItem('competitions')
         const storedTeams = localStorage.getItem('teams')
+        const storedUsers = localStorage.getItem('users')
         
         if (storedCompetitions) {
           const allCompetitions = JSON.parse(storedCompetitions)
@@ -229,6 +231,15 @@ export default function CompetitionDetailPage() {
                 )
                 setUserTeams(userTeams)
               }
+            }
+            
+            // Загружаем данные об участниках для индивидуальных соревнований
+            if (storedUsers && foundCompetition.participants && foundCompetition.participants.length > 0) {
+              const users = JSON.parse(storedUsers)
+              const participants = users.filter(user => 
+                foundCompetition.participants.includes(user.id)
+              )
+              setRegisteredParticipants(participants)
             }
           } else {
             setError('Соревнование не найдено')
@@ -335,6 +346,57 @@ export default function CompetitionDetailPage() {
       setIsRegistering(false)
     }
   }
+
+  const handleIndividualRegistration = () => {
+    if (!user || !competition) return;
+
+    setIsRegistering(true);
+    setError('');
+
+    try {
+      // Получаем соревнования из localStorage
+      const storedCompetitions = localStorage.getItem('competitions');
+      const storedUsers = localStorage.getItem('users');
+      
+      if (storedCompetitions && storedUsers) {
+        const competitions = JSON.parse(storedCompetitions);
+        const users = JSON.parse(storedUsers);
+        
+        const competitionId = typeof id === 'string' ? parseInt(id, 10) : id;
+        const competitionIndex = competitions.findIndex(c => c.id === competitionId);
+
+        if (competitionIndex !== -1) {
+          // Проверяем, не зарегистрирован ли уже пользователь
+          if (!competitions[competitionIndex].participants) {
+            competitions[competitionIndex].participants = [];
+          }
+          
+          if (competitions[competitionIndex].participants.includes(user.id)) {
+            setError('Вы уже зарегистрированы на это соревнование');
+            setIsRegistering(false);
+            return;
+          }
+          
+          // Добавляем пользователя
+          competitions[competitionIndex].participants.push(user.id);
+          competitions[competitionIndex].participantCount = competitions[competitionIndex].participants.length;
+          localStorage.setItem('competitions', JSON.stringify(competitions));
+          
+          // Обновляем список участников
+          const currentUser = users.find(u => u.id === user.id);
+          if (currentUser) {
+            setRegisteredParticipants([...registeredParticipants, currentUser]);
+          }
+          
+          setRegistrationSuccess(true);
+        }
+      }
+    } catch (err) {
+      setError('Ошибка при регистрации');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
 
   const getStatusBadge = (status) => {
     let bgColor, textColor, label
@@ -517,131 +579,199 @@ export default function CompetitionDetailPage() {
                     </ul>
                   </div>
                   
-                  <div className="mb-6">
-                    <h3 className="text-xl font-bold mb-4 flex items-center">
-                      <FaUsers className="mr-2 text-primary-600" /> Команды-участники
-                    </h3>
-                    
-                    {participatingTeams.length > 0 ? (
-                      <div className="space-y-3">
-                        {participatingTeams.map(team => (
-                          <Link 
-                            key={team.id} 
-                            href={`/teams/${team.id}`}
-                            className="flex items-center p-3 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors"
-                          >
-                            <div className="w-10 h-10 relative rounded-full overflow-hidden bg-gray-200 mr-3 flex-shrink-0">
-                              {team.image ? (
-                                <Image 
-                                  src={team.image} 
-                                  alt={team.name} 
-                                  fill 
-                                  className="object-cover"
-                                />
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center text-gray-400">
-                                  <FaUsers />
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <h4 className="font-medium">{team.name}</h4>
-                              <p className="text-sm text-gray-500">{team.memberCount || (team.members ? team.members.length : 0)} участников</p>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-600 text-center py-4 bg-gray-50 rounded-lg">
-                        Пока нет зарегистрированных команд
-                      </p>
-                    )}
-                    
-                    {competition.status !== 'completed' && !showTeamSelection && (
-                      <button 
-                        onClick={() => {
-                          if (!user) {
-                            router.push('/login')
-                            return
-                          }
-                          setShowTeamSelection(true)
-                        }}
-                        className="mt-4 w-full btn-primary flex items-center justify-center"
-                        disabled={participatingTeams.length >= competition.maxTeams}
-                      >
-                        {participatingTeams.length >= competition.maxTeams ? (
-                          <>
-                            <FaInfoCircle className="mr-2" /> Достигнут лимит команд
-                          </>
-                        ) : (
-                          <>
-                            <FaUserPlus className="mr-2" /> Зарегистрировать команду
-                          </>
-                        )}
-                      </button>
-                    )}
-                    
-                    {showTeamSelection && (
-                      <div className="mt-4 border border-gray-200 rounded-lg p-4">
-                        <h4 className="font-medium mb-3">Выберите команду для регистрации:</h4>
-                        
-                        {userTeams.length > 0 ? (
-                          <>
-                            <select
-                              value={selectedTeam}
-                              onChange={(e) => setSelectedTeam(e.target.value)}
-                              className="input mb-3 w-full"
+                  {/* --- Блок для командных соревнований --- */}
+                  {competition.competitionType === 'team' && (
+                    <div className="mb-6">
+                      <h3 className="text-xl font-bold mb-4 flex items-center">
+                        <FaUsers className="mr-2 text-primary-600" /> Команды-участники
+                      </h3>
+                      {participatingTeams.length > 0 ? (
+                        <div className="space-y-3">
+                          {participatingTeams.map(team => (
+                            <Link 
+                              key={team.id} 
+                              href={`/teams/${team.id}`}
+                              className="flex items-center p-3 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors"
                             >
-                              <option value="">-- Выберите команду --</option>
-                              {userTeams
-                                .filter(team => !participatingTeams.some(pt => pt.id === team.id))
-                                .map(team => (
-                                  <option key={team.id} value={team.id}>
-                                    {team.name} ({team.memberCount || (team.members ? team.members.length : 0)} участников)
-                                  </option>
-                                ))
-                              }
-                            </select>
-                            
-                            <div className="flex gap-2">
-                              <button 
-                                onClick={handleAddTeam}
-                                disabled={!selectedTeam || isRegistering}
-                                className="btn-primary flex-1 flex items-center justify-center"
-                              >
-                                {isRegistering ? (
-                                  <>
-                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Регистрация...
-                                  </>
+                              <div className="w-10 h-10 relative rounded-full overflow-hidden bg-gray-200 mr-3 flex-shrink-0">
+                                {team.image ? (
+                                  <Image 
+                                    src={team.image} 
+                                    alt={team.name} 
+                                    fill 
+                                    className="object-cover"
+                                  />
                                 ) : (
-                                  <>
-                                    <FaUserPlus className="mr-2" /> Зарегистрировать
-                                  </>
+                                  <div className="h-full w-full flex items-center justify-center text-gray-400">
+                                    <FaUsers />
+                                  </div>
                                 )}
-                              </button>
-                              <button 
-                                onClick={() => setShowTeamSelection(false)}
-                                className="btn-outline flex-1"
-                              >
-                                Отмена
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-center py-3">
-                            <p className="text-gray-600 mb-3">У вас нет команд, которые могли бы участвовать</p>
-                            <Link href="/teams/create" className="btn-primary inline-flex items-center">
-                              <FaPlus className="mr-2" /> Создать команду
+                              </div>
+                              <div>
+                                <h4 className="font-medium">{team.name}</h4>
+                                <p className="text-sm text-gray-500">{team.memberCount || (team.members ? team.members.length : 0)} участников</p>
+                              </div>
                             </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-600 text-center py-4 bg-gray-50 rounded-lg">
+                          Пока нет зарегистрированных команд
+                        </p>
+                      )}
+                      {competition.status !== 'completed' && !showTeamSelection && (
+                        <button 
+                          onClick={() => {
+                            if (!user) {
+                              router.push('/login')
+                              return
+                            }
+                            setShowTeamSelection(true)
+                          }}
+                          className="mt-4 w-full btn-primary flex items-center justify-center"
+                          disabled={participatingTeams.length >= competition.maxTeams}
+                        >
+                          {participatingTeams.length >= competition.maxTeams ? (
+                            <>
+                              <FaInfoCircle className="mr-2" /> Достигнут лимит команд
+                            </>
+                          ) : (
+                            <>
+                              <FaUserPlus className="mr-2" /> Зарегистрировать команду
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {showTeamSelection && (
+                        <div className="mt-4 border border-gray-200 rounded-lg p-4">
+                          <h4 className="font-medium mb-3">Выберите команду для регистрации:</h4>
+                          {userTeams.length > 0 ? (
+                            <>
+                              <select
+                                value={selectedTeam}
+                                onChange={(e) => setSelectedTeam(e.target.value)}
+                                className="input mb-3 w-full"
+                              >
+                                <option value="">-- Выберите команду --</option>
+                                {userTeams
+                                  .filter(team => !participatingTeams.some(pt => pt.id === team.id))
+                                  .map(team => (
+                                    <option key={team.id} value={team.id}>
+                                      {team.name} ({team.memberCount || (team.members ? team.members.length : 0)} участников)
+                                    </option>
+                                  ))
+                                }
+                              </select>
+                              <div className="flex gap-2">
+                                <button 
+                                  onClick={handleAddTeam}
+                                  disabled={!selectedTeam || isRegistering}
+                                  className="btn-primary flex-1 flex items-center justify-center"
+                                >
+                                  {isRegistering ? (
+                                    <>
+                                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      Регистрация...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FaUserPlus className="mr-2" /> Зарегистрировать
+                                    </>
+                                  )}
+                                </button>
+                                <button 
+                                  onClick={() => setShowTeamSelection(false)}
+                                  className="btn-outline flex-1"
+                                >
+                                  Отмена
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center py-3">
+                              <p className="text-gray-600 mb-3">У вас нет команд, которые могли бы участвовать</p>
+                              <Link href="/teams/create" className="btn-primary inline-flex items-center">
+                                <FaPlus className="mr-2" /> Создать команду
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* --- Блок для индивидуальных соревнований --- */}
+                  {competition.competitionType === 'individual' && (
+                    <div className="mb-6">
+                      <h3 className="text-xl font-bold mb-4 flex items-center">
+                        <FaUserPlus className="mr-2 text-primary-600" /> Индивидуальное участие
+                      </h3>
+                      
+                      {/* Список участников */}
+                      <div className="mb-4">
+                        <h4 className="font-medium mb-3">Участники соревнования:</h4>
+                        {registeredParticipants.length > 0 ? (
+                          <div className="space-y-3">
+                            {registeredParticipants.map(participant => (
+                              <div 
+                                key={participant.id} 
+                                className="flex items-center p-3 border border-gray-200 rounded-lg"
+                              >
+                                <div className="w-8 h-8 relative rounded-full overflow-hidden bg-gray-200 mr-3 flex-shrink-0">
+                                  {participant.avatar ? (
+                                    <Image 
+                                      src={participant.avatar} 
+                                      alt={participant.name} 
+                                      fill 
+                                      className="object-cover"
+                                    />
+                                  ) : (
+                                    <div className="h-full w-full flex items-center justify-center text-gray-400">
+                                      <FaUserPlus />
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <h4 className="font-medium">{participant.name}</h4>
+                                </div>
+                              </div>
+                            ))}
                           </div>
+                        ) : (
+                          <p className="text-gray-600 text-center py-4 bg-gray-50 rounded-lg">
+                            Пока нет зарегистрированных участников
+                          </p>
                         )}
                       </div>
-                    )}
-                  </div>
+                      
+                      {/* Кнопка регистрации */}
+                      {!user ? (
+                        <div className="text-center">
+                          <p className="text-gray-600 mb-4">Для участия необходимо войти в систему</p>
+                          <Link href="/login" className="btn-primary inline-flex items-center">
+                            <FaUserPlus className="mr-2" /> Войти
+                          </Link>
+                        </div>
+                      ) : registrationSuccess ? (
+                        <div className="text-center text-green-600">
+                          <FaCheckCircle className="mx-auto text-4xl mb-2" />
+                          <p className="font-semibold">Вы успешно зарегистрированы!</p>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleIndividualRegistration}
+                          disabled={isRegistering}
+                          className="w-full btn-primary flex items-center justify-center"
+                        >
+                          {isRegistering ? 'Регистрация...' : 'Зарегистрироваться'}
+                        </button>
+                      )}
+                      {error && <p className="text-red-600 text-center mt-2">{error}</p>}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
