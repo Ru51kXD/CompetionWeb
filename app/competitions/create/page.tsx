@@ -15,6 +15,12 @@ export default function CreateCompetitionPage() {
   const { user, isAdmin } = useAuth()
   const [isLoaded, setIsLoaded] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const competitionTypeOptions = [
+    { value: '', label: 'Выберите тип' },
+    { value: 'Спортивные', label: 'Спортивные' },
+    { value: 'Интеллектуальные', label: 'Интеллектуальные' },
+    { value: 'Творческие', label: 'Творческие' },
+  ];
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -31,7 +37,8 @@ export default function CreateCompetitionPage() {
     country: '',
     competitionType: 'team', // Default to team competition
     prizePool: 0, // Prize pool amount
-    entryFee: 0 // Entry fee amount
+    entryFee: 0, // Entry fee amount
+    type: '', // Новый параметр
   })
   const [errors, setErrors] = useState({
     title: '',
@@ -41,7 +48,8 @@ export default function CreateCompetitionPage() {
     location: '',
     image: '',
     maxTeams: '',
-    maxTeamSize: ''
+    maxTeamSize: '',
+    type: '',
   })
   const [teams, setTeams] = useState([])
   const [selectedTeams, setSelectedTeams] = useState([])
@@ -121,7 +129,8 @@ export default function CreateCompetitionPage() {
       location: '',
       image: '',
       maxTeams: '',
-      maxTeamSize: ''
+      maxTeamSize: '',
+      type: '',
     }
 
     if (!formData.title.trim()) {
@@ -178,6 +187,11 @@ export default function CreateCompetitionPage() {
       isValid = false
     }
 
+    if (!formData.type) {
+      isValid = false;
+      newErrors.type = 'Выберите тип соревнования';
+    }
+
     setErrors(newErrors)
     return isValid
   }
@@ -208,7 +222,8 @@ export default function CreateCompetitionPage() {
           competitionType: formData.competitionType,
           prizePool: formData.prizePool,
           entryFee: formData.entryFee,
-          paidTeams: [] // Teams that have paid the entry fee
+          paidTeams: [], // Teams that have paid the entry fee
+          type: formData.type,
         }
         
         // Load existing competitions from localStorage
@@ -481,6 +496,24 @@ export default function CreateCompetitionPage() {
                     />
                   </div>
                   <p className="text-gray-500 text-xs mt-1">Укажите 0 для бесплатного участия</p>
+                </div>
+                
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="type">
+                    Тип соревнования *
+                  </label>
+                  <select
+                    id="type"
+                    name="type"
+                    value={formData.type}
+                    onChange={handleChange}
+                    className={`input ${errors.type ? 'border-red-500' : ''}`}
+                  >
+                    {competitionTypeOptions.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  {errors.type && <p className="text-red-500 text-xs mt-1">{errors.type}</p>}
                 </div>
                 
                 {formData.competitionType === 'team' && (

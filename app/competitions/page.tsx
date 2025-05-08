@@ -22,7 +22,8 @@ const mockCompetitions = [
     image: 'https://images.unsplash.com/photo-1604948501466-4e9c339b9c24?q=80&w=2070',
     teams: [1, 2, 3, 4, 5, 6, 7, 8], // Команды, участвующие в соревновании
     competitionType: 'team',
-    sportType: 'chess'
+    sportType: 'chess',
+    type: 'Интеллектуальные',
   },
   {
     id: 2,
@@ -36,7 +37,8 @@ const mockCompetitions = [
     image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2023',
     teams: [1, 3, 5, 6],
     competitionType: 'team',
-    sportType: 'football'
+    sportType: 'football',
+    type: 'Спортивные',
   },
   {
     id: 3,
@@ -50,7 +52,8 @@ const mockCompetitions = [
     image: 'https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?q=80&w=2070',
     teams: [2, 4, 5],
     competitionType: 'team',
-    sportType: 'intellectual'
+    sportType: 'intellectual',
+    type: 'Интеллектуальные',
   },
   {
     id: 4,
@@ -72,7 +75,8 @@ const mockCompetitions = [
       { teamId: 4, points: 65, position: 6 }
     ],
     competitionType: 'team',
-    sportType: 'swimming'
+    sportType: 'swimming',
+    type: 'Спортивные',
   },
   {
     id: 5,
@@ -94,7 +98,8 @@ const mockCompetitions = [
       { teamId: 4, points: 180, position: 6 }
     ],
     competitionType: 'team',
-    sportType: 'bowling'
+    sportType: 'bowling',
+    type: 'Спортивные',
   },
   {
     id: 6,
@@ -116,8 +121,346 @@ const mockCompetitions = [
       { teamId: 2, points: 0, position: 6 }
     ],
     competitionType: 'team',
-    sportType: 'football'
-  }
+    sportType: 'football',
+    type: 'Спортивные',
+  },
+  // Новые творческие соревнования
+  {
+    id: 7,
+    title: 'Фестиваль современного танца',
+    description: 'Творческий конкурс среди танцевальных коллективов',
+    startDate: '2023-08-10',
+    endDate: '2023-08-12',
+    location: 'Дом культуры',
+    participantCount: 10,
+    status: 'upcoming',
+    image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=2070',
+    teams: [4, 14, 17, 20],
+    competitionType: 'team',
+    sportType: 'dance',
+    type: 'Творческие',
+  },
+  {
+    id: 8,
+    title: 'Конкурс художественного рисунка',
+    description: 'Творческий конкурс для юных художников',
+    startDate: '2023-09-01',
+    endDate: '2023-09-03',
+    location: 'Галерея искусств',
+    participantCount: 15,
+    status: 'upcoming',
+    image: 'https://images.unsplash.com/photo-1464983953574-0892a716854b?q=80&w=2070',
+    teams: [6, 17, 20],
+    competitionType: 'team',
+    sportType: 'art',
+    type: 'Творческие',
+  },
+  {
+    id: 9,
+    title: 'Музыкальный фестиваль "Звуки города"',
+    description: 'Фестиваль для музыкальных коллективов и сольных исполнителей',
+    startDate: '2023-10-15',
+    endDate: '2023-10-17',
+    location: 'Концертный зал',
+    participantCount: 20,
+    status: 'upcoming',
+    image: 'https://images.unsplash.com/photo-1465101178521-c1a9136a3fdc?q=80&w=2070',
+    teams: [17, 20],
+    competitionType: 'team',
+    sportType: 'music',
+    type: 'Творческие',
+  },
+  {
+    id: 10,
+    title: 'Квиз "Знатоки"',
+    description: 'Интеллектуальный квиз для команд и индивидуальных участников',
+    startDate: '2023-11-05',
+    endDate: '2023-11-05',
+    location: 'Коворкинг-центр',
+    participantCount: 12,
+    status: 'upcoming',
+    image: 'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?q=80&w=2070',
+    teams: [3, 12, 15, 18],
+    competitionType: 'team',
+    sportType: 'quiz',
+    type: 'Интеллектуальные',
+  },
+  // Интеллектуальные
+  {
+    id: 11,
+    title: 'Олимпиада по математике',
+    description: 'Интеллектуальное индивидуальное соревнование по математике',
+    startDate: '2023-12-01',
+    endDate: '2023-12-01',
+    location: 'Школа №1',
+    participantCount: 30,
+    status: 'upcoming',
+    image: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?q=80&w=2070',
+    teams: [],
+    competitionType: 'individual',
+    sportType: 'math',
+    type: 'Интеллектуальные',
+  },
+  {
+    id: 12,
+    title: 'Квиз "Знатоки истории"',
+    description: 'Интеллектуальный командный квиз по истории',
+    startDate: '2023-12-10',
+    endDate: '2023-12-10',
+    location: 'Исторический музей',
+    participantCount: 10,
+    status: 'active',
+    image: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?q=80&w=2070',
+    teams: [3, 12, 15],
+    competitionType: 'team',
+    sportType: 'quiz',
+    type: 'Интеллектуальные',
+  },
+  {
+    id: 13,
+    title: 'Турнир по программированию',
+    description: 'Интеллектуальное соревнование для программистов',
+    startDate: '2023-11-20',
+    endDate: '2023-11-21',
+    location: 'IT-центр',
+    participantCount: 20,
+    status: 'completed',
+    image: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=2070',
+    teams: [2, 5, 8],
+    competitionType: 'team',
+    sportType: 'programming',
+    type: 'Интеллектуальные',
+  },
+  // Творческие
+  {
+    id: 14,
+    title: 'Фестиваль уличного искусства',
+    description: 'Творческий конкурс для художников и дизайнеров',
+    startDate: '2023-12-15',
+    endDate: '2023-12-17',
+    location: 'Парк культуры',
+    participantCount: 15,
+    status: 'upcoming',
+    image: 'https://images.unsplash.com/photo-1464983953574-0892a716854b?q=80&w=2070',
+    teams: [6, 17],
+    competitionType: 'team',
+    sportType: 'art',
+    type: 'Творческие',
+  },
+  {
+    id: 15,
+    title: 'Конкурс вокалистов',
+    description: 'Творческий индивидуальный конкурс вокалистов',
+    startDate: '2023-12-20',
+    endDate: '2023-12-20',
+    location: 'Дом музыки',
+    participantCount: 12,
+    status: 'active',
+    image: 'https://images.unsplash.com/photo-1465101178521-c1a9136a3fdc?q=80&w=2070',
+    teams: [],
+    competitionType: 'individual',
+    sportType: 'music',
+    type: 'Творческие',
+  },
+  {
+    id: 16,
+    title: 'Театральный марафон',
+    description: 'Творческий командный конкурс театральных коллективов',
+    startDate: '2023-11-25',
+    endDate: '2023-11-27',
+    location: 'Театр драмы',
+    participantCount: 8,
+    status: 'completed',
+    image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=2070',
+    teams: [11, 20],
+    competitionType: 'team',
+    sportType: 'theatre',
+    type: 'Творческие',
+  },
+  // Спортивные
+  {
+    id: 17,
+    title: 'Летний кубок по баскетболу',
+    description: 'Спортивное командное соревнование по баскетболу',
+    startDate: '2023-12-05',
+    endDate: '2023-12-07',
+    location: 'Баскетбольная арена',
+    participantCount: 10,
+    status: 'upcoming',
+    image: 'https://images.unsplash.com/photo-1519864600265-abb23847ef2c?q=80&w=2070',
+    teams: [19, 5, 9],
+    competitionType: 'team',
+    sportType: 'basketball',
+    type: 'Спортивные',
+  },
+  {
+    id: 18,
+    title: 'Зимний марафон',
+    description: 'Спортивное индивидуальное соревнование по бегу',
+    startDate: '2023-12-22',
+    endDate: '2023-12-22',
+    location: 'Городской стадион',
+    participantCount: 50,
+    status: 'active',
+    image: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?q=80&w=2070',
+    teams: [],
+    competitionType: 'individual',
+    sportType: 'running',
+    type: 'Спортивные',
+  },
+  {
+    id: 19,
+    title: 'Турнир по настольному теннису',
+    description: 'Спортивное индивидуальное соревнование по настольному теннису',
+    startDate: '2023-11-15',
+    endDate: '2023-11-16',
+    location: 'Спорткомплекс',
+    participantCount: 16,
+    status: 'completed',
+    image: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=2070',
+    teams: [],
+    competitionType: 'individual',
+    sportType: 'tennis',
+    type: 'Спортивные',
+  },
+  // --- Спортивные ---
+  {
+    id: 101,
+    title: 'Весенний турнир по футболу',
+    description: 'Командное спортивное соревнование по футболу среди школ города',
+    startDate: '2023-04-10',
+    endDate: '2023-04-12',
+    location: 'Стадион "Юность"',
+    participantCount: 8,
+    status: 'upcoming',
+    image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2023',
+    teams: [1, 2, 3, 4],
+    competitionType: 'team',
+    sportType: 'football',
+    type: 'Спортивные',
+  },
+  {
+    id: 102,
+    title: 'Летний марафон',
+    description: 'Индивидуальное спортивное соревнование по бегу',
+    startDate: '2023-06-20',
+    endDate: '2023-06-20',
+    location: 'Городской парк',
+    participantCount: 50,
+    status: 'active',
+    image: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?q=80&w=2070',
+    teams: [],
+    competitionType: 'individual',
+    sportType: 'running',
+    type: 'Спортивные',
+  },
+  {
+    id: 103,
+    title: 'Осенний кубок по баскетболу',
+    description: 'Командное спортивное соревнование по баскетболу',
+    startDate: '2023-09-15',
+    endDate: '2023-09-17',
+    location: 'Баскетбольная арена',
+    participantCount: 10,
+    status: 'completed',
+    image: 'https://images.unsplash.com/photo-1519864600265-abb23847ef2c?q=80&w=2070',
+    teams: [5, 6, 7],
+    competitionType: 'team',
+    sportType: 'basketball',
+    type: 'Спортивные',
+  },
+  // --- Интеллектуальные ---
+  {
+    id: 201,
+    title: 'Олимпиада по физике',
+    description: 'Индивидуальное интеллектуальное соревнование по физике',
+    startDate: '2023-05-05',
+    endDate: '2023-05-05',
+    location: 'Лицей №2',
+    participantCount: 20,
+    status: 'upcoming',
+    image: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?q=80&w=2070',
+    teams: [],
+    competitionType: 'individual',
+    sportType: 'physics',
+    type: 'Интеллектуальные',
+  },
+  {
+    id: 202,
+    title: 'Квиз "Знатоки литературы"',
+    description: 'Командный интеллектуальный квиз по литературе',
+    startDate: '2023-07-10',
+    endDate: '2023-07-10',
+    location: 'Библиотека',
+    participantCount: 12,
+    status: 'active',
+    image: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?q=80&w=2070',
+    teams: [8, 9],
+    competitionType: 'team',
+    sportType: 'quiz',
+    type: 'Интеллектуальные',
+  },
+  {
+    id: 203,
+    title: 'Турнир по шахматам',
+    description: 'Командное интеллектуальное соревнование по шахматам',
+    startDate: '2023-03-15',
+    endDate: '2023-03-17',
+    location: 'Шахматный клуб',
+    participantCount: 6,
+    status: 'completed',
+    image: 'https://images.unsplash.com/photo-1604948501466-4e9c339b9c24?q=80&w=2070',
+    teams: [10, 11],
+    competitionType: 'team',
+    sportType: 'chess',
+    type: 'Интеллектуальные',
+  },
+  // --- Творческие ---
+  {
+    id: 301,
+    title: 'Фестиваль живописи',
+    description: 'Творческий конкурс для художников',
+    startDate: '2023-08-01',
+    endDate: '2023-08-03',
+    location: 'Галерея искусств',
+    participantCount: 15,
+    status: 'upcoming',
+    image: 'https://images.unsplash.com/photo-1464983953574-0892a716854b?q=80&w=2070',
+    teams: [12, 13],
+    competitionType: 'team',
+    sportType: 'art',
+    type: 'Творческие',
+  },
+  {
+    id: 302,
+    title: 'Конкурс вокалистов',
+    description: 'Индивидуальный творческий конкурс вокалистов',
+    startDate: '2023-10-10',
+    endDate: '2023-10-10',
+    location: 'Дом музыки',
+    participantCount: 10,
+    status: 'active',
+    image: 'https://images.unsplash.com/photo-1465101178521-c1a9136a3fdc?q=80&w=2070',
+    teams: [],
+    competitionType: 'individual',
+    sportType: 'music',
+    type: 'Творческие',
+  },
+  {
+    id: 303,
+    title: 'Театральный марафон',
+    description: 'Командный творческий конкурс театральных коллективов',
+    startDate: '2023-09-20',
+    endDate: '2023-09-22',
+    location: 'Театр драмы',
+    participantCount: 8,
+    status: 'completed',
+    image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=2070',
+    teams: [14, 15],
+    competitionType: 'team',
+    sportType: 'theatre',
+    type: 'Творческие',
+  },
 ]
 
 // Массив стадионов в Астане
@@ -216,6 +559,13 @@ const formatDate = (dateString) => {
   const options = { year: 'numeric', month: 'long', day: 'numeric' } as Intl.DateTimeFormatOptions
   return new Date(dateString).toLocaleDateString('ru-RU', options)
 }
+
+const competitionTypeOptions = [
+  { value: 'all', label: 'Все типы' },
+  { value: 'Спортивные', label: 'Спортивные' },
+  { value: 'Интеллектуальные', label: 'Интеллектуальные' },
+  { value: 'Творческие', label: 'Творческие' },
+]
 
 export default function CompetitionsPage() {
   const [competitions, setCompetitions] = useState([])
@@ -534,16 +884,15 @@ export default function CompetitionsPage() {
                         </div>
                         
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Тип</label>
+                          <label className="block text-xs text-gray-500 mb-1">Тип</label>
                           <select
                             value={typeFilter}
-                            onChange={(e) => setTypeFilter(e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            onChange={e => setTypeFilter(e.target.value)}
+                            className="input w-full"
                           >
-                            <option value="all">Все типы</option>
-                            <option value="sports">Спортивные</option>
-                            <option value="intellectual">Интеллектуальные</option>
-                            <option value="creative">Творческие</option>
+                            {competitionTypeOptions.map(option => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
                           </select>
                         </div>
                         
@@ -655,9 +1004,9 @@ export default function CompetitionsPage() {
                             
                             {competition.type && (
                               <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/90 text-gray-700 border border-gray-200">
-                                {competition.type === 'SPORTS' && 'Спортивное'}
-                                {competition.type === 'INTELLECTUAL' && 'Интеллектуальное'}
-                                {competition.type === 'CREATIVE' && 'Творческое'}
+                                {competition.type === 'Спортивные' && 'Спортивное'}
+                                {competition.type === 'Интеллектуальные' && 'Интеллектуальное'}
+                                {competition.type === 'Творческие' && 'Творческое'}
                               </span>
                             )}
                           </div>
