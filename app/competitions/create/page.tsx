@@ -8,6 +8,7 @@ import Navbar from '../../components/Navbar'
 import Footer from '../../components/Footer'
 import { FaTrophy, FaMapMarkerAlt, FaCalendarAlt, FaImage, FaInfoCircle, FaUsers, FaListUl, FaArrowLeft, FaTrash, FaPlus } from 'react-icons/fa'
 import { useAuth } from '../../context/AuthContext'
+import GoogleLocationPicker from '../../components/GoogleLocationPicker'
 
 export default function CreateCompetitionPage() {
   const router = useRouter()
@@ -24,7 +25,10 @@ export default function CreateCompetitionPage() {
     participantCount: 0,
     status: 'upcoming',
     maxTeams: 10, // Maximum number of teams that can participate
-    maxTeamSize: 10 // Maximum number of members per team
+    maxTeamSize: 10, // Maximum number of members per team
+    coordinates: [37.6156, 55.7522] as [number, number], // Москва по умолчанию
+    city: '',
+    country: ''
   })
   const [errors, setErrors] = useState({
     title: '',
@@ -242,6 +246,16 @@ export default function CreateCompetitionPage() {
       }
     }
   }
+
+  const handleLocationChange = (location) => {
+    setFormData({
+      ...formData,
+      location: location.address,
+      coordinates: location.coordinates,
+      city: location.city,
+      country: location.country
+    })
+  }
   
   // Don't render if not logged in
   if (!user) {
@@ -350,25 +364,21 @@ export default function CreateCompetitionPage() {
                   {errors.endDate && <p className="text-red-500 text-xs mt-1">{errors.endDate}</p>}
                 </div>
                 
-                <div>
-                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="location">
-                    Место проведения *
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Местоположение
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FaMapMarkerAlt className="text-gray-400" />
-                    </div>
-                    <input
-                      id="location"
-                      name="location"
-                      type="text"
-                      value={formData.location}
-                      onChange={handleChange}
-                      className={`input pl-10 ${errors.location ? 'border-red-500' : ''}`}
-                      placeholder="Укажите место проведения"
-                    />
-                  </div>
-                  {errors.location && <p className="text-red-500 text-xs mt-1">{errors.location}</p>}
+                  <p className="text-gray-600 text-sm mb-3">
+                    Выберите место проведения соревнования на карте или введите адрес в поле поиска
+                  </p>
+                  <GoogleLocationPicker 
+                    initialAddress={formData.location}
+                    initialCoordinates={formData.coordinates}
+                    onLocationChange={handleLocationChange}
+                  />
+                  {errors.location && (
+                    <p className="text-red-500 text-xs mt-1">{errors.location}</p>
+                  )}
                 </div>
                 
                 <div>

@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FaBars, FaTimes, FaTrophy, FaUserCircle, FaSignOutAlt, FaUserCog, FaEnvelope, FaBell, FaSearch, FaChevronDown } from 'react-icons/fa'
+import { FaBars, FaTimes, FaTrophy, FaUserCircle, FaSignOutAlt, FaUserCog, FaEnvelope, FaBell, FaSearch, FaChevronDown, FaMapMarkerAlt } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
+import { usePathname, useRouter } from 'next/navigation'
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
@@ -12,6 +13,8 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const { user, logout, isAdmin } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -447,10 +450,20 @@ export default function Navbar() {
                 <motion.div variants={mobileItemVariants}>
                   <Link 
                     href="/competitions" 
-                    className="block py-3 px-4 text-lg font-medium hover:text-primary-600 rounded-lg hover:bg-gray-50"
+                    className={`nav-link ${pathname && pathname.startsWith('/competitions') && !pathname.includes('/map') ? 'active' : ''}`}
                     onClick={() => setIsOpen(false)}
                   >
                     Соревнования
+                  </Link>
+                </motion.div>
+                
+                <motion.div variants={mobileItemVariants}>
+                  <Link 
+                    href="/competitions/map" 
+                    className={`nav-link ${pathname && pathname.includes('/competitions/map') ? 'active' : ''}`}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <FaMapMarkerAlt className="inline mr-1" /> Карта соревнований
                   </Link>
                 </motion.div>
                 

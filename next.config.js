@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['images.unsplash.com', 'randomuser.me', 'via.placeholder.com', 'cdn.viberu.ru'],
+    domains: ['images.unsplash.com', 'randomuser.me', 'via.placeholder.com', 'cdn.viberu.ru', 'www.google.com'],
   },
   swcMinify: true,
   optimizeFonts: true,

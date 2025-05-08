@@ -28,6 +28,26 @@ CompetitionWeb - это современная веб-платформа для 
 - `/prisma` - Схема базы данных и миграции
 - `/public` - Статические ресурсы
 
+## Настройка Google Maps API
+
+Для корректной работы карты соревнований необходимо настроить Google Maps API ключ:
+
+1. Перейдите на [Google Cloud Console](https://console.cloud.google.com/)
+2. Создайте новый проект или выберите существующий
+3. В боковом меню выберите "APIs & Services" > "Library"
+4. Активируйте следующие API:
+   - Maps JavaScript API
+   - Places API
+   - Geocoding API
+5. В боковом меню выберите "APIs & Services" > "Credentials"
+6. Нажмите "Create Credentials" > "API Key"
+7. Скопируйте созданный ключ
+8. Создайте файл `.env.local` в корневой директории проекта со следующим содержимым:
+   ```
+   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=ваш_ключ_api
+   ```
+9. Перезапустите сервер разработки
+
 ## Запуск проекта
 
 1. Установите зависимости:

@@ -9,6 +9,57 @@ import Navbar from '../../components/Navbar'
 import Footer from '../../components/Footer'
 import { FaCalendarAlt, FaMapMarkerAlt, FaClock, FaUsers, FaClipboardList, FaUserPlus, FaTrophy, FaArrowLeft, FaEdit, FaPlus, FaInfoCircle, FaExclamationTriangle, FaCheckCircle, FaTimesCircle } from 'react-icons/fa'
 import { useAuth } from '../../context/AuthContext'
+import GoogleLocationMap from '../../components/GoogleLocationMap'
+
+// Type definitions
+interface User {
+  id: number;
+  name: string;
+  email?: string;
+  avatar?: string;
+}
+
+interface TeamMember {
+  id: number;
+  name: string;
+}
+
+interface Team {
+  id: number;
+  name: string;
+  memberCount?: number;
+  members?: TeamMember[];
+  image?: string;
+  ownerId?: number;
+  competitionCount?: number;
+  maxMembers?: number;
+}
+
+interface Competition {
+  id: number;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  location: string;
+  image?: string;
+  status: 'upcoming' | 'active' | 'completed';
+  teams?: number[];
+  participants?: number[];
+  maxTeams: number;
+  maxTeamSize: number;
+  participantCount?: number;
+  coordinates?: [number, number];
+  rules?: string;
+  organizer?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  city?: string;
+  country?: string;
+  competitionType?: 'team' | 'individual';
+  createdBy?: number;
+  creatorName?: string;
+}
 
 // Mock data for competitions (same as on the listing page)
 const mockCompetitions = [
@@ -166,20 +217,20 @@ const formatTime = (date: Date) => {
 export default function CompetitionDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const id = params.id
-  const [competition, setCompetition] = useState(null)
-  const [participatingTeams, setParticipatingTeams] = useState([])
-  const [allTeams, setAllTeams] = useState([])
+  const id = params?.id
+  const [competition, setCompetition] = useState<Competition | null>(null)
+  const [participatingTeams, setParticipatingTeams] = useState<Team[]>([])
+  const [allTeams, setAllTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showTeamSelection, setShowTeamSelection] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState('')
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [registeredTeamName, setRegisteredTeamName] = useState('')
-  const [userTeams, setUserTeams] = useState([])
+  const [userTeams, setUserTeams] = useState<Team[]>([])
   const [teamSizeError, setTeamSizeError] = useState('')
   const [isRegistering, setIsRegistering] = useState(false)
-  const [registeredParticipants, setRegisteredParticipants] = useState([])
+  const [registeredParticipants, setRegisteredParticipants] = useState<User[]>([])
   const { user, isAdmin } = useAuth()
 
   useEffect(() => {
@@ -363,7 +414,7 @@ export default function CompetitionDetailPage() {
         const users = JSON.parse(storedUsers);
         
         const competitionId = typeof id === 'string' ? parseInt(id, 10) : id;
-        const competitionIndex = competitions.findIndex(c => c.id === competitionId);
+        const competitionIndex = competitions.findIndex((c: any) => c.id === competitionId);
 
         if (competitionIndex !== -1) {
           // Проверяем, не зарегистрирован ли уже пользователь
@@ -383,7 +434,7 @@ export default function CompetitionDetailPage() {
           localStorage.setItem('competitions', JSON.stringify(competitions));
           
           // Обновляем список участников
-          const currentUser = users.find(u => u.id === user.id);
+          const currentUser = users.find((u: any) => u.id === user.id) as User;
           if (currentUser) {
             setRegisteredParticipants([...registeredParticipants, currentUser]);
           }
@@ -398,37 +449,37 @@ export default function CompetitionDetailPage() {
     }
   };
 
-  const getStatusBadge = (status) => {
-    let bgColor, textColor, label
+  const getStatusBadge = (status: string) => {
+    let bgColor, textColor, label;
     
     switch(status) {
       case 'upcoming':
-        bgColor = 'bg-blue-100'
-        textColor = 'text-blue-700'
-        label = 'Предстоит'
-        break
+        bgColor = 'bg-blue-100';
+        textColor = 'text-blue-700';
+        label = 'Предстоит';
+        break;
       case 'active':
-        bgColor = 'bg-green-100'
-        textColor = 'text-green-700'
-        label = 'Активно'
-        break
+        bgColor = 'bg-green-100';
+        textColor = 'text-green-700';
+        label = 'Активно';
+        break;
       case 'completed':
-        bgColor = 'bg-gray-100'
-        textColor = 'text-gray-700'
-        label = 'Завершено'
-        break
+        bgColor = 'bg-gray-100';
+        textColor = 'text-gray-700';
+        label = 'Завершено';
+        break;
       default:
-        bgColor = 'bg-gray-100'
-        textColor = 'text-gray-700'
-        label = 'Неизвестно'
+        bgColor = 'bg-gray-100';
+        textColor = 'text-gray-700';
+        label = 'Неизвестно';
     }
     
     return (
       <div className={`${bgColor} ${textColor} inline-flex items-center px-3 py-1 rounded-full text-sm font-medium`}>
         {label}
       </div>
-    )
-  }
+    );
+  };
 
   if (loading) {
     return (
@@ -577,6 +628,18 @@ export default function CompetitionDetailPage() {
                         <span>до {competition.maxTeamSize} человек</span>
                       </li>
                     </ul>
+                    
+                    {/* Карта местоположения */}
+                    {competition.coordinates && competition.coordinates.length === 2 && (
+                      <div className="mt-4">
+                        <h4 className="font-medium mb-2">Местоположение:</h4>
+                        <GoogleLocationMap 
+                          address={competition.location}
+                          coordinates={competition.coordinates}
+                          title={competition.title}
+                        />
+                      </div>
+                    )}
                   </div>
                   
                   {/* --- Блок для командных соревнований --- */}
@@ -587,7 +650,7 @@ export default function CompetitionDetailPage() {
                       </h3>
                       {participatingTeams.length > 0 ? (
                         <div className="space-y-3">
-                          {participatingTeams.map(team => (
+                          {participatingTeams.map((team: Team) => (
                             <Link 
                               key={team.id} 
                               href={`/teams/${team.id}`}
@@ -654,9 +717,9 @@ export default function CompetitionDetailPage() {
                               >
                                 <option value="">-- Выберите команду --</option>
                                 {userTeams
-                                  .filter(team => !participatingTeams.some(pt => pt.id === team.id))
-                                  .map(team => (
-                                    <option key={team.id} value={team.id}>
+                                  .filter((team: Team) => !participatingTeams.some((pt: Team) => pt.id === team.id))
+                                  .map((team: Team) => (
+                                    <option key={team.id} value={team.id.toString()}>
                                       {team.name} ({team.memberCount || (team.members ? team.members.length : 0)} участников)
                                     </option>
                                   ))
@@ -715,7 +778,7 @@ export default function CompetitionDetailPage() {
                         <h4 className="font-medium mb-3">Участники соревнования:</h4>
                         {registeredParticipants.length > 0 ? (
                           <div className="space-y-3">
-                            {registeredParticipants.map(participant => (
+                            {registeredParticipants.map((participant: User) => (
                               <div 
                                 key={participant.id} 
                                 className="flex items-center p-3 border border-gray-200 rounded-lg"

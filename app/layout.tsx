@@ -3,6 +3,7 @@ import { Inter, Raleway } from 'next/font/google'
 import type { Metadata } from 'next'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
+import dynamic from 'next/dynamic'
 
 const inter = Inter({
   subsets: ['latin', 'cyrillic'],
@@ -16,9 +17,15 @@ const raleway = Raleway({
   variable: '--font-raleway',
 })
 
+// Dynamically import the MapsProvider with no SSR to avoid issues
+const MapsProvider = dynamic(
+  () => import('./components/MapsProvider').then(mod => mod.MapsProvider),
+  { ssr: false }
+)
+
 export const metadata: Metadata = {
-  title: 'CompetitionWeb - Платформа для проведения соревнований',
-  description: 'Организация спортивных, интеллектуальных и творческих соревнований',
+  title: 'CompetitionWeb - Управление соревнованиями',
+  description: 'Платформа для создания и управления соревнованиями, командами и участниками',
 }
 
 export default function RootLayout({
@@ -27,11 +34,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ru" className={`${inter.variable} ${raleway.variable}`}>
-      <body className="min-h-screen">
+    <html lang="ru" className={`${inter.variable} ${raleway.variable} h-full`}>
+      <body className={`${inter.className} h-full`}>
         <AuthProvider>
           <ThemeProvider>
-            {children}
+            <MapsProvider>
+              {children}
+            </MapsProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>
