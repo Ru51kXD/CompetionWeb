@@ -4,20 +4,24 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
-import { FaCalendarAlt, FaMapMarkerAlt, FaTag } from 'react-icons/fa'
+import { FaCalendarAlt, FaMapMarkerAlt, FaTag, FaUsers, FaUser, FaChess } from 'react-icons/fa'
 
 type CompetitionType = 'SPORTS' | 'INTELLECTUAL' | 'CREATIVE'
+type CompetitionFormat = 'team' | 'individual'
 
 interface CompetitionCardProps {
   id: number
   title: string
   description: string
-  type: CompetitionType
+  type?: CompetitionType
+  competitionType?: CompetitionFormat
+  sportType?: string
   startDate: Date
   endDate: Date
   location?: string
   image?: string
   index: number
+  participantCount?: number
 }
 
 const typeLabels: Record<CompetitionType, string> = {
@@ -32,16 +36,30 @@ const typeColors: Record<CompetitionType, string> = {
   CREATIVE: 'bg-accent-100 text-accent-800'
 }
 
+const sportTypeLabels: Record<string, string> = {
+  'chess': 'Шахматы',
+  'checkers': 'Шашки',
+  'tennis': 'Теннис',
+  'badminton': 'Бадминтон',
+  'swimming': 'Плавание',
+  'running': 'Бег',
+  'cycling': 'Велоспорт',
+  'other': 'Другое'
+}
+
 export default function CompetitionCard({
   id,
   title,
   description,
   type,
+  competitionType = 'team',
+  sportType,
   startDate,
   endDate,
   location,
   image = 'https://images.unsplash.com/photo-1506485338023-6ce5f36692df?q=80&w=2070',
-  index
+  index,
+  participantCount = 0
 }: CompetitionCardProps) {
   const [hovered, setHovered] = useState(false)
   
@@ -71,11 +89,30 @@ export default function CompetitionCard({
           fill
           className={`object-cover transition-transform duration-500 ${hovered ? 'scale-110' : 'scale-100'}`}
         />
-        <div className="absolute top-4 left-4">
-          <span className={`text-sm font-medium px-3 py-1 rounded-full ${typeColors[type]}`}>
-            {typeLabels[type]}
+        <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+          {type && (
+            <span className={`text-sm font-medium px-3 py-1 rounded-full ${typeColors[type]}`}>
+              {typeLabels[type]}
+            </span>
+          )}
+          
+          <span className={`text-sm font-medium px-3 py-1 rounded-full ${competitionType === 'team' ? 'bg-accent-100 text-accent-800' : 'bg-green-100 text-green-800'}`}>
+            {competitionType === 'team' ? (
+              <><FaUsers className="inline-block mr-1" /> Командное</>
+            ) : (
+              <><FaUser className="inline-block mr-1" /> Индивидуальное</>
+            )}
           </span>
         </div>
+        
+        {sportType && competitionType === 'individual' && (
+          <div className="absolute top-14 left-4">
+            <span className="text-sm font-medium px-3 py-1 rounded-full bg-white/90 text-gray-700">
+              {sportType === 'chess' && <FaChess className="inline-block mr-1" />}
+              {sportTypeLabels[sportType] || sportType}
+            </span>
+          </div>
+        )}
       </div>
       
       <div className="p-6">
@@ -94,6 +131,20 @@ export default function CompetitionCard({
               <span>{location}</span>
             </div>
           )}
+          
+          <div className="flex items-center text-sm text-gray-500">
+            {competitionType === 'team' ? (
+              <>
+                <FaUsers className="mr-2 text-primary-500" />
+                <span>{participantCount} команд</span>
+              </>
+            ) : (
+              <>
+                <FaUser className="mr-2 text-primary-500" />
+                <span>{participantCount} участников</span>
+              </>
+            )}
+          </div>
         </div>
         
         <Link 

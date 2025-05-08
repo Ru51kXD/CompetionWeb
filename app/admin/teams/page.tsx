@@ -181,7 +181,7 @@ export default function AdminTeamsPage() {
                   </Link>
                   <div className="flex space-x-2">
                     <Link 
-                      href={`/admin/teams/${team.id}/edit`}
+                      href={`/teams/${team.id}/edit`}
                       className="text-primary-600 hover:text-primary-900"
                     >
                       <FaEdit />

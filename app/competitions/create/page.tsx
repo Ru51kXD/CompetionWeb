@@ -6,12 +6,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '../../components/Navbar'
 import Footer from '../../components/Footer'
-import { FaTrophy, FaMapMarkerAlt, FaCalendarAlt, FaImage, FaInfoCircle, FaUsers, FaListUl } from 'react-icons/fa'
+import { FaTrophy, FaMapMarkerAlt, FaCalendarAlt, FaImage, FaInfoCircle, FaUsers, FaListUl, FaArrowLeft, FaTrash, FaPlus } from 'react-icons/fa'
 import { useAuth } from '../../context/AuthContext'
 
 export default function CreateCompetitionPage() {
   const router = useRouter()
-  const { isAdmin } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [isLoaded, setIsLoaded] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
@@ -22,7 +22,9 @@ export default function CreateCompetitionPage() {
     location: '',
     image: '',
     participantCount: 0,
-    status: 'upcoming'
+    status: 'upcoming',
+    maxTeams: 10, // Maximum number of teams that can participate
+    maxTeamSize: 10 // Maximum number of members per team
   })
   const [errors, setErrors] = useState({
     title: '',
@@ -30,15 +32,17 @@ export default function CreateCompetitionPage() {
     startDate: '',
     endDate: '',
     location: '',
-    image: ''
+    image: '',
+    maxTeams: '',
+    maxTeamSize: ''
   })
   const [teams, setTeams] = useState([])
   const [selectedTeams, setSelectedTeams] = useState([])
 
   useEffect(() => {
-    // Redirect if not admin
-    if (!isAdmin()) {
-      router.push('/login')
+    // Redirect if not logged in
+    if (!user) {
+      router.push('/login?redirect=/competitions/create')
       return
     }
     
@@ -56,13 +60,13 @@ export default function CreateCompetitionPage() {
     } catch (error) {
       console.error('Ошибка при загрузке команд:', error)
     }
-  }, [router, isAdmin])
+  }, [router, user])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'maxTeams' || name === 'maxTeamSize' ? parseInt(value, 10) || 0 : value
     }))
 
     // Clear errors when typing
@@ -77,12 +81,27 @@ export default function CreateCompetitionPage() {
   const handleTeamSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const teamId = parseInt(e.target.value, 10)
     if (teamId && !selectedTeams.includes(teamId)) {
+      if (selectedTeams.length >= formData.maxTeams) {
+        setErrors(prev => ({
+          ...prev,
+          maxTeams: `Достигнуто максимальное количество команд (${formData.maxTeams})`
+        }))
+        return
+      }
       setSelectedTeams([...selectedTeams, teamId])
     }
   }
 
   const removeSelectedTeam = (teamId: number) => {
     setSelectedTeams(selectedTeams.filter(id => id !== teamId))
+    
+    // Clear max teams error if we're now below the limit
+    if (errors.maxTeams && selectedTeams.length <= formData.maxTeams) {
+      setErrors(prev => ({
+        ...prev,
+        maxTeams: ''
+      }))
+    }
   }
 
   const validateForm = () => {
@@ -93,7 +112,9 @@ export default function CreateCompetitionPage() {
       startDate: '',
       endDate: '',
       location: '',
-      image: ''
+      image: '',
+      maxTeams: '',
+      maxTeamSize: ''
     }
 
     if (!formData.title.trim()) {
@@ -129,6 +150,16 @@ export default function CreateCompetitionPage() {
       newErrors.location = 'Место проведения обязательно'
       isValid = false
     }
+    
+    if (formData.maxTeams <= 0) {
+      newErrors.maxTeams = 'Количество команд должно быть больше 0'
+      isValid = false
+    }
+    
+    if (formData.maxTeamSize <= 0) {
+      newErrors.maxTeamSize = 'Размер команды должен быть больше 0'
+      isValid = false
+    }
 
     setErrors(newErrors)
     return isValid
@@ -152,7 +183,11 @@ export default function CreateCompetitionPage() {
           image: formData.image || 'https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?q=80&w=2070',
           participantCount: selectedTeams.length || 0,
           status: formData.status,
-          teams: selectedTeams
+          teams: selectedTeams,
+          maxTeams: formData.maxTeams,
+          maxTeamSize: formData.maxTeamSize,
+          createdBy: user?.id || 0,
+          creatorName: user?.name || 'Аноним'
         }
         
         // Load existing competitions from localStorage
@@ -170,7 +205,7 @@ export default function CreateCompetitionPage() {
         competitions.push(newCompetition)
         localStorage.setItem('competitions', JSON.stringify(competitions))
         
-        // Update team competition counts
+        // Update team competition counts and enforce team size limits
         if (selectedTeams.length > 0) {
           const storedTeams = localStorage.getItem('teams')
           if (storedTeams) {
@@ -179,9 +214,15 @@ export default function CreateCompetitionPage() {
             selectedTeams.forEach(teamId => {
               const teamIndex = teams.findIndex((t: any) => t.id === teamId)
               if (teamIndex !== -1) {
+                // Update competition count
                 teams[teamIndex] = {
                   ...teams[teamIndex],
                   competitionCount: (teams[teamIndex].competitionCount || 0) + 1
+                }
+                
+                // Ensure the team has maxMembers set based on the competition limit
+                if (!teams[teamIndex].maxMembers || teams[teamIndex].maxMembers > formData.maxTeamSize) {
+                  teams[teamIndex].maxMembers = formData.maxTeamSize
                 }
               }
             })
@@ -201,151 +242,115 @@ export default function CreateCompetitionPage() {
       }
     }
   }
-
-  const formVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { 
-        duration: 0.6,
-        staggerChildren: 0.1,
-        delayChildren: 0.2
-      }
-    }
+  
+  // Don't render if not logged in
+  if (!user) {
+    return null
   }
 
-  const inputVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary-500"></div>
+        </main>
+        <Footer />
+      </div>
+    )
   }
-
+  
   return (
-    <div className={`min-h-screen flex flex-col ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
+    <div className="min-h-screen flex flex-col">
       <Navbar />
       
       <main className="flex-grow pt-24 pb-20">
         <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Создание соревнования</h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Создайте новое соревнование и пригласите команды к участию
-            </p>
-          </motion.div>
+          <div className="mb-6">
+            <Link href="/competitions" className="inline-flex items-center text-primary-600 hover:text-primary-800 transition-colors">
+              <FaArrowLeft className="mr-2" /> Вернуться к списку соревнований
+            </Link>
+          </div>
           
-          <div className="max-w-3xl mx-auto">
-            <motion.div 
-              variants={formVariants}
-              initial="hidden"
-              animate="visible"
-              className="bg-white rounded-xl shadow-lg p-8"
-            >
-              <form onSubmit={handleSubmit}>
-                <motion.div variants={inputVariants} className="mb-6">
+          <div className="bg-white rounded-xl shadow-xl overflow-hidden p-6 md:p-8">
+            <h1 className="text-3xl font-bold mb-6">Создание нового соревнования</h1>
+            
+            <form onSubmit={handleSubmit}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
                   <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="title">
                     Название соревнования *
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FaTrophy className="text-gray-400" />
-                    </div>
-                    <input
-                      id="title"
-                      name="title"
-                      type="text"
-                      value={formData.title}
-                      onChange={handleChange}
-                      className={`input pl-10 ${errors.title ? 'border-red-500' : ''}`}
-                      placeholder="Введите название соревнования"
-                    />
-                  </div>
-                  {errors.title && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center">
-                      <FaInfoCircle className="mr-1" />
-                      {errors.title}
-                    </p>
-                  )}
-                </motion.div>
-                
-                <motion.div variants={inputVariants} className="mb-6">
-                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="description">
-                    Описание соревнования *
-                  </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
+                  <input
+                    id="title"
+                    name="title"
+                    type="text"
+                    value={formData.title}
                     onChange={handleChange}
-                    className={`input ${errors.description ? 'border-red-500' : ''}`}
-                    placeholder="Опишите ваше соревнование, правила участия и другую важную информацию"
-                    rows={4}
+                    className={`input ${errors.title ? 'border-red-500' : ''}`}
+                    placeholder="Введите название соревнования"
                   />
-                  {errors.description && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center">
-                      <FaInfoCircle className="mr-1" />
-                      {errors.description}
-                    </p>
-                  )}
-                </motion.div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <motion.div variants={inputVariants}>
-                    <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="startDate">
-                      Дата начала *
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FaCalendarAlt className="text-gray-400" />
-                      </div>
-                      <input
-                        id="startDate"
-                        name="startDate"
-                        type="date"
-                        value={formData.startDate}
-                        onChange={handleChange}
-                        className={`input pl-10 ${errors.startDate ? 'border-red-500' : ''}`}
-                      />
-                    </div>
-                    {errors.startDate && (
-                      <p className="text-red-500 text-xs mt-1 flex items-center">
-                        <FaInfoCircle className="mr-1" />
-                        {errors.startDate}
-                      </p>
-                    )}
-                  </motion.div>
-                  
-                  <motion.div variants={inputVariants}>
-                    <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="endDate">
-                      Дата окончания *
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FaCalendarAlt className="text-gray-400" />
-                      </div>
-                      <input
-                        id="endDate"
-                        name="endDate"
-                        type="date"
-                        value={formData.endDate}
-                        onChange={handleChange}
-                        className={`input pl-10 ${errors.endDate ? 'border-red-500' : ''}`}
-                      />
-                    </div>
-                    {errors.endDate && (
-                      <p className="text-red-500 text-xs mt-1 flex items-center">
-                        <FaInfoCircle className="mr-1" />
-                        {errors.endDate}
-                      </p>
-                    )}
-                  </motion.div>
+                  {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
                 </div>
                 
-                <motion.div variants={inputVariants} className="mb-6">
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="status">
+                    Статус соревнования *
+                  </label>
+                  <select
+                    id="status"
+                    name="status"
+                    value={formData.status}
+                    onChange={handleChange}
+                    className="input"
+                  >
+                    <option value="upcoming">Предстоит</option>
+                    <option value="active">Активно</option>
+                    <option value="completed">Завершено</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="startDate">
+                    Дата начала *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FaCalendarAlt className="text-gray-400" />
+                    </div>
+                    <input
+                      id="startDate"
+                      name="startDate"
+                      type="date"
+                      value={formData.startDate}
+                      onChange={handleChange}
+                      className={`input pl-10 ${errors.startDate ? 'border-red-500' : ''}`}
+                    />
+                  </div>
+                  {errors.startDate && <p className="text-red-500 text-xs mt-1">{errors.startDate}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="endDate">
+                    Дата окончания *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FaCalendarAlt className="text-gray-400" />
+                    </div>
+                    <input
+                      id="endDate"
+                      name="endDate"
+                      type="date"
+                      value={formData.endDate}
+                      onChange={handleChange}
+                      className={`input pl-10 ${errors.endDate ? 'border-red-500' : ''}`}
+                    />
+                  </div>
+                  {errors.endDate && <p className="text-red-500 text-xs mt-1">{errors.endDate}</p>}
+                </div>
+                
+                <div>
                   <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="location">
                     Место проведения *
                   </label>
@@ -360,40 +365,13 @@ export default function CreateCompetitionPage() {
                       value={formData.location}
                       onChange={handleChange}
                       className={`input pl-10 ${errors.location ? 'border-red-500' : ''}`}
-                      placeholder="Укажите место проведения соревнования"
+                      placeholder="Укажите место проведения"
                     />
                   </div>
-                  {errors.location && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center">
-                      <FaInfoCircle className="mr-1" />
-                      {errors.location}
-                    </p>
-                  )}
-                </motion.div>
+                  {errors.location && <p className="text-red-500 text-xs mt-1">{errors.location}</p>}
+                </div>
                 
-                <motion.div variants={inputVariants} className="mb-6">
-                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="status">
-                    Статус соревнования
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FaListUl className="text-gray-400" />
-                    </div>
-                    <select
-                      id="status"
-                      name="status"
-                      value={formData.status}
-                      onChange={handleChange}
-                      className="input pl-10"
-                    >
-                      <option value="upcoming">Предстоит</option>
-                      <option value="active">Активно</option>
-                      <option value="completed">Завершено</option>
-                    </select>
-                  </div>
-                </motion.div>
-                
-                <motion.div variants={inputVariants} className="mb-6">
+                <div>
                   <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="image">
                     URL изображения
                   </label>
@@ -407,104 +385,165 @@ export default function CreateCompetitionPage() {
                       type="text"
                       value={formData.image}
                       onChange={handleChange}
-                      className={`input pl-10 ${errors.image ? 'border-red-500' : ''}`}
-                      placeholder="Введите URL изображения соревнования"
+                      className="input pl-10"
+                      placeholder="Укажите URL изображения соревнования"
                     />
                   </div>
-                  <p className="text-gray-500 text-xs mt-1">
-                    Оставьте пустым для использования изображения по умолчанию
-                  </p>
-                  {errors.image && (
-                    <p className="text-red-500 text-xs mt-1 flex items-center">
-                      <FaInfoCircle className="mr-1" />
-                      {errors.image}
-                    </p>
-                  )}
-                </motion.div>
+                </div>
                 
-                <motion.div variants={inputVariants} className="mb-8">
-                  <label className="block text-gray-700 text-sm font-medium mb-2">
-                    Выберите команды-участники
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="maxTeams">
+                    Максимальное количество команд *
                   </label>
-                  <div className="flex gap-4 items-center">
-                    <div className="relative flex-grow">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FaUsers className="text-gray-400" />
-                      </div>
-                      <select
-                        className="input pl-10 w-full"
-                        onChange={handleTeamSelect}
-                        value=""
-                      >
-                        <option value="" disabled>Выберите команду для добавления</option>
-                        {teams.map(team => (
-                          <option 
-                            key={team.id} 
-                            value={team.id}
-                            disabled={selectedTeams.includes(team.id)}
-                          >
-                            {team.name}
-                          </option>
-                        ))}
-                      </select>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FaUsers className="text-gray-400" />
                     </div>
+                    <input
+                      id="maxTeams"
+                      name="maxTeams"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={formData.maxTeams}
+                      onChange={handleChange}
+                      className={`input pl-10 ${errors.maxTeams ? 'border-red-500' : ''}`}
+                    />
                   </div>
-                  
-                  {selectedTeams.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-sm font-medium mb-2">Выбранные команды:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedTeams.map(teamId => {
-                          const team = teams.find(t => t.id === teamId)
-                          return team ? (
-                            <div 
-                              key={teamId}
-                              className="inline-flex items-center bg-gray-100 rounded-full px-3 py-1 text-sm"
-                            >
-                              {team.name}
-                              <button 
-                                type="button"
-                                onClick={() => removeSelectedTeam(teamId)}
-                                className="ml-2 text-gray-500 hover:text-red-500"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ) : null
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <p className="text-gray-500 text-xs mt-3">
-                    Вы можете выбрать несколько команд или добавить их позже
-                  </p>
-                </motion.div>
+                  {errors.maxTeams && <p className="text-red-500 text-xs mt-1">{errors.maxTeams}</p>}
+                  <p className="text-gray-500 text-xs mt-1">Выбрано команд: {selectedTeams.length} из {formData.maxTeams}</p>
+                </div>
                 
-                <motion.div variants={inputVariants} className="flex flex-col sm:flex-row gap-4 mt-8">
-                  <button
-                    type="submit"
-                    className="btn-primary py-3 flex-1 flex items-center justify-center"
-                    disabled={isSubmitting}
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="maxTeamSize">
+                    Максимальный размер команды *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FaUsers className="text-gray-400" />
+                    </div>
+                    <input
+                      id="maxTeamSize"
+                      name="maxTeamSize"
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={formData.maxTeamSize}
+                      onChange={handleChange}
+                      className={`input pl-10 ${errors.maxTeamSize ? 'border-red-500' : ''}`}
+                    />
+                  </div>
+                  {errors.maxTeamSize && <p className="text-red-500 text-xs mt-1">{errors.maxTeamSize}</p>}
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="description">
+                    Описание соревнования *
+                  </label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    className={`input min-h-[120px] ${errors.description ? 'border-red-500' : ''}`}
+                    placeholder="Введите описание соревнования"
+                    rows={4}
+                  ></textarea>
+                  {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
+                </div>
+              </div>
+              
+              {/* Team selection section */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <FaUsers className="mr-2 text-primary-500" /> Выбор команд-участников
+                </h3>
+                
+                <div className="flex flex-wrap gap-3 mb-4">
+                  {selectedTeams.length > 0 ? (
+                    selectedTeams.map(teamId => {
+                      const team = teams.find(t => t.id === teamId)
+                      return team ? (
+                        <div 
+                          key={teamId}
+                          className="bg-gray-100 rounded-full py-1 px-3 flex items-center text-sm"
+                        >
+                          <span className="mr-2">{team.name}</span>
+                          <button 
+                            type="button"
+                            onClick={() => removeSelectedTeam(teamId)}
+                            className="text-gray-500 hover:text-red-500"
+                          >
+                            <FaTrash size={12} />
+                          </button>
+                        </div>
+                      ) : null
+                    })
+                  ) : (
+                    <p className="text-gray-500 text-sm">Нет выбранных команд. Выберите команды из списка ниже.</p>
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  <select
+                    className="input flex-grow"
+                    onChange={handleTeamSelect}
+                    value=""
                   >
-                    {isSubmitting ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Создание...
-                      </>
-                    ) : (
-                      'Создать соревнование'
-                    )}
+                    <option value="">-- Выберите команду --</option>
+                    {teams
+                      .filter(team => !selectedTeams.includes(team.id))
+                      .map(team => (
+                        <option key={team.id} value={team.id}>
+                          {team.name} ({team.memberCount || 0} участников)
+                        </option>
+                      ))
+                    }
+                  </select>
+                  <button 
+                    type="button"
+                    onClick={() => document.getElementById('team-select')?.focus()}
+                    className="btn-outline py-2 px-4 flex items-center"
+                    disabled={selectedTeams.length >= formData.maxTeams}
+                  >
+                    <FaPlus className="mr-1" /> Добавить
                   </button>
-                  <Link href="/competitions" className="btn-outline py-3 flex-1 text-center">
-                    Отмена
-                  </Link>
-                </motion.div>
-              </form>
-            </motion.div>
+                </div>
+                {errors.maxTeams && (
+                  <p className="text-yellow-600 text-sm mt-2 flex items-center">
+                    <FaInfoCircle className="mr-1" /> {errors.maxTeams}
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <Link
+                  href="/competitions"
+                  className="btn-outline py-2 px-4 flex items-center"
+                >
+                  Отмена
+                </Link>
+                <button
+                  type="submit"
+                  className="btn-primary py-2 px-4 flex items-center"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Создание...
+                    </>
+                  ) : (
+                    <>
+                      <FaTrophy className="mr-2" /> Создать соревнование
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </main>

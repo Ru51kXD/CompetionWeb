@@ -183,6 +183,7 @@ export default function ContactPage() {
               initial="hidden"
               animate="visible"
               className="bg-white rounded-xl shadow-lg p-8"
+              style={{ backgroundColor: 'var(--color-bg-primary)' }}
             >
               <form onSubmit={handleSubmit}>
                 {errors.general && (
@@ -333,11 +334,11 @@ export default function ContactPage() {
             >
               <h2 className="text-2xl font-semibold mb-4">Другие способы связи</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left max-w-2xl mx-auto">
-                <div className="bg-white p-6 rounded-lg shadow-md">
+                <div className="bg-white p-6 rounded-lg shadow-md" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
                   <h3 className="font-semibold text-lg mb-2">Email</h3>
                   <p className="text-gray-600">info@competitionweb.ru</p>
                 </div>
-                <div className="bg-white p-6 rounded-lg shadow-md">
+                <div className="bg-white p-6 rounded-lg shadow-md" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
                   <h3 className="font-semibold text-lg mb-2">Телефон</h3>
                   <p className="text-gray-600">+7 (123) 456-7890</p>
                 </div>

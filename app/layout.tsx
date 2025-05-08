@@ -2,6 +2,7 @@ import './globals.css'
 import { Inter, Raleway } from 'next/font/google'
 import type { Metadata } from 'next'
 import { AuthProvider } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
 
 const inter = Inter({
   subsets: ['latin', 'cyrillic'],
@@ -27,9 +28,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru" className={`${inter.variable} ${raleway.variable}`}>
-      <body className="min-h-screen bg-gray-50">
+      <body className="min-h-screen">
         <AuthProvider>
-          {children}
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>

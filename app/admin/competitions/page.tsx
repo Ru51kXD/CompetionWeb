@@ -176,7 +176,7 @@ export default function AdminCompetitionsPage() {
                   </Link>
                   <div className="flex space-x-2">
                     <Link 
-                      href={`/admin/competitions/${competition.id}/edit`}
+                      href={`/competitions/${competition.id}/edit`}
                       className="text-primary-600 hover:text-primary-900"
                     >
                       <FaEdit />
