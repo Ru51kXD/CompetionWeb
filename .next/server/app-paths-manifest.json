@@ -1,6 +1,12 @@
 {
-  "/page": "app/page.js",
-  "/teams/page": "app/teams/page.js",
+  "/login/page": "app/login/page.js",
   "/competitions/page": "app/competitions/page.js",
-  "/about/page": "app/about/page.js"
+  "/competitions/[id]/page": "app/competitions/[id]/page.js",
+  "/contact/page": "app/contact/page.js",
+  "/page": "app/page.js",
+  "/admin/users/page": "app/admin/users/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/admin/teams/page": "app/admin/teams/page.js",
+  "/admin/competitions/page": "app/admin/competitions/page.js",
+  "/admin/messages/page": "app/admin/messages/page.js"
 }

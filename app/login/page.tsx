@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { FaEnvelope, FaLock, FaCheck, FaExclamationTriangle } from 'react-icons/fa'
+import { useAuth } from '../context/AuthContext'
 
 export default function LoginPage() {
   const [isLoaded, setIsLoaded] = useState(false)
@@ -20,10 +22,16 @@ export default function LoginPage() {
     general: ''
   })
   const [submitStatus, setSubmitStatus] = useState<'none' | 'loading' | 'success' | 'error'>('none')
+  const router = useRouter()
+  const { login, user } = useAuth()
 
   useEffect(() => {
     setIsLoaded(true)
-  }, [])
+    // If user is already logged in, redirect to home
+    if (user) {
+      router.push('/')
+    }
+  }, [user, router])
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -71,30 +79,42 @@ export default function LoginPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (validateForm()) {
       setSubmitStatus('loading')
       
-      // Simulate API call
-      setTimeout(() => {
-        // Mock authentication - In a real app, we would validate credentials with the server
-        if (formData.email === 'admin@example.com' && formData.password === 'admin123') {
+      try {
+        const result = await login(formData.email, formData.password)
+        
+        if (result.success) {
           setSubmitStatus('success')
           
-          // Redirect to home page after successful login
+          // Redirect after successful login
           setTimeout(() => {
-            window.location.href = '/'
+            // Redirect admin to admin dashboard
+            if (formData.email === 'admin@example.com') {
+              router.push('/admin')
+            } else {
+              router.push('/')
+            }
           }, 1000)
         } else {
           setErrors(prev => ({
             ...prev,
-            general: 'Неверный email или пароль'
+            general: result.message
           }))
           setSubmitStatus('error')
         }
-      }, 1000)
+      } catch (error) {
+        console.error('Login error:', error)
+        setErrors(prev => ({
+          ...prev,
+          general: 'Ошибка при входе. Попробуйте позже.'
+        }))
+        setSubmitStatus('error')
+      }
     } else {
       setSubmitStatus('error')
     }
@@ -116,6 +136,11 @@ export default function LoginPage() {
   const inputVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+  }
+
+  // Don't render the page if the user is already logged in
+  if (user) {
+    return null
   }
 
   return (
@@ -144,6 +169,20 @@ export default function LoginPage() {
               className="bg-white rounded-xl shadow-lg p-8"
             >
               <form onSubmit={handleSubmit}>
+                {errors.general && (
+                  <div className="mb-6 p-3 bg-red-50 text-red-700 rounded-md flex items-center">
+                    <FaExclamationTriangle className="mr-2" />
+                    {errors.general}
+                  </div>
+                )}
+                
+                {submitStatus === 'success' && (
+                  <div className="mb-6 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
+                    <FaCheck className="mr-2" />
+                    Вход выполнен успешно. Перенаправление...
+                  </div>
+                )}
+                
                 <motion.div variants={inputVariants} className="mb-6">
                   <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="email">
                     Email
@@ -204,70 +243,53 @@ export default function LoginPage() {
                       type="checkbox"
                       checked={formData.rememberMe}
                       onChange={handleChange}
-                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                     />
                     <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-700">
                       Запомнить меня
                     </label>
                   </div>
                   
-                  <Link href="/forgot-password" className="text-sm text-primary-600 hover:text-primary-800">
+                  <Link href="#" className="text-sm text-primary-600 hover:text-primary-800">
                     Забыли пароль?
                   </Link>
                 </motion.div>
                 
-                {errors.general && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm flex items-start"
+                <motion.div variants={inputVariants}>
+                  <button
+                    type="submit"
+                    disabled={submitStatus === 'loading' || submitStatus === 'success'}
+                    className="btn-primary w-full py-3 flex items-center justify-center"
                   >
-                    <FaExclamationTriangle className="mr-2 mt-0.5" />
-                    <span>{errors.general}</span>
-                  </motion.div>
-                )}
+                    {submitStatus === 'loading' ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Вход...
+                      </>
+                    ) : (
+                      'Войти'
+                    )}
+                  </button>
+                </motion.div>
                 
-                <motion.button
-                  variants={inputVariants}
-                  type="submit"
-                  className="btn-primary w-full py-3 relative"
-                  disabled={submitStatus === 'loading' || submitStatus === 'success'}
-                >
-                  {submitStatus === 'loading' ? (
-                    <span className="flex items-center justify-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Вход...
-                    </span>
-                  ) : submitStatus === 'success' ? (
-                    <span className="flex items-center justify-center">
-                      <FaCheck className="mr-2" />
-                      Успешный вход!
-                    </span>
-                  ) : (
-                    "Войти"
-                  )}
-                </motion.button>
-              </form>
-              
-              <motion.div variants={inputVariants} className="mt-6 text-center text-sm text-gray-600">
-                Нет аккаунта?{' '}
-                <Link href="/register" className="text-primary-600 hover:text-primary-800 font-medium">
-                  Зарегистрироваться
-                </Link>
-              </motion.div>
-              
-              <motion.div variants={inputVariants} className="mt-8 pt-6 border-t border-gray-200">
-                <p className="text-sm text-gray-500 text-center mb-4">
-                  Для демонстрации вы можете использовать:
-                </p>
-                <div className="bg-gray-50 p-3 rounded-md text-sm">
-                  <p><strong>Email:</strong> admin@example.com</p>
-                  <p><strong>Пароль:</strong> admin123</p>
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-gray-600">
+                    Еще нет аккаунта?{' '}
+                    <Link href="/register" className="text-primary-600 hover:text-primary-800 font-medium">
+                      Зарегистрироваться
+                    </Link>
+                  </p>
                 </div>
-              </motion.div>
+                
+                <div className="mt-4 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
+                  <p>Для входа в панель администратора используйте:</p>
+                  <p className="mt-1">Email: admin@example.com</p>
+                  <p>Пароль: admin123</p>
+                </div>
+              </form>
             </motion.div>
           </div>
         </div>

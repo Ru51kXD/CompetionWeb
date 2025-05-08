@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { FaUser, FaEnvelope, FaLock, FaCheck, FaExclamationTriangle } from 'react-icons/fa'
+import { useAuth } from '../context/AuthContext'
 
 export default function RegisterPage() {
   const [isLoaded, setIsLoaded] = useState(false)
@@ -19,13 +21,20 @@ export default function RegisterPage() {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    general: ''
   })
   const [submitStatus, setSubmitStatus] = useState<'none' | 'loading' | 'success' | 'error'>('none')
+  const router = useRouter()
+  const { user } = useAuth()
 
   useEffect(() => {
     setIsLoaded(true)
-  }, [])
+    // If user is already logged in, redirect to home
+    if (user) {
+      router.push('/')
+    }
+  }, [user, router])
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -38,7 +47,8 @@ export default function RegisterPage() {
       name: '',
       email: '',
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      general: ''
     }
 
     if (!formData.name.trim()) {
@@ -93,10 +103,39 @@ export default function RegisterPage() {
     if (validateForm()) {
       setSubmitStatus('loading')
       
-      // Simulate API call
-      setTimeout(() => {
-        // In a real app, we would send data to the server here
-        console.log('Registration data:', formData)
+      try {
+        // Check if user already exists
+        const storedUsers = localStorage.getItem('users')
+        const users = storedUsers ? JSON.parse(storedUsers) : []
+        
+        const emailExists = users.some((user: any) => user.email === formData.email)
+        if (emailExists) {
+          setErrors(prev => ({
+            ...prev,
+            email: 'Пользователь с таким email уже существует',
+            general: 'Пользователь с таким email уже существует'
+          }))
+          setSubmitStatus('error')
+          return
+        }
+        
+        // Create new user
+        const newUser = {
+          id: Date.now(),
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: 'user',
+          createdAt: new Date().toISOString()
+        }
+        
+        // Add to users array
+        users.push(newUser)
+        
+        // Save to localStorage
+        localStorage.setItem('users', JSON.stringify(users))
+        
+        // Set success status
         setSubmitStatus('success')
         
         // Reset form after successful registration
@@ -109,9 +148,16 @@ export default function RegisterPage() {
         
         // Redirect to login after 2 seconds
         setTimeout(() => {
-          window.location.href = '/login'
+          router.push('/login')
         }, 2000)
-      }, 1500)
+      } catch (error) {
+        console.error('Ошибка при регистрации:', error)
+        setErrors(prev => ({
+          ...prev,
+          general: 'Ошибка при регистрации. Пожалуйста, попробуйте снова.'
+        }))
+        setSubmitStatus('error')
+      }
     } else {
       setSubmitStatus('error')
     }
@@ -133,6 +179,11 @@ export default function RegisterPage() {
   const inputVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+  }
+
+  // Don't render the page if the user is already logged in
+  if (user) {
+    return null
   }
 
   return (
@@ -161,6 +212,20 @@ export default function RegisterPage() {
               className="bg-white rounded-xl shadow-lg p-8"
             >
               <form onSubmit={handleSubmit}>
+                {errors.general && (
+                  <div className="mb-6 p-3 bg-red-50 text-red-700 rounded-md flex items-center">
+                    <FaExclamationTriangle className="mr-2" />
+                    {errors.general}
+                  </div>
+                )}
+                
+                {submitStatus === 'success' && (
+                  <div className="mb-6 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
+                    <FaCheck className="mr-2" />
+                    Регистрация успешно завершена! Перенаправляем вас на страницу входа...
+                  </div>
+                )}
+                
                 <motion.div variants={inputVariants} className="mb-6">
                   <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="name">
                     Имя
@@ -254,7 +319,7 @@ export default function RegisterPage() {
                       value={formData.confirmPassword}
                       onChange={handleChange}
                       className={`input pl-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
-                      placeholder="Введите пароль еще раз"
+                      placeholder="Введите пароль повторно"
                     />
                   </div>
                   {errors.confirmPassword && (
@@ -265,48 +330,40 @@ export default function RegisterPage() {
                   )}
                 </motion.div>
                 
-                <motion.button
-                  variants={inputVariants}
-                  type="submit"
-                  className="btn-primary w-full py-3 relative"
-                  disabled={submitStatus === 'loading' || submitStatus === 'success'}
-                >
-                  {submitStatus === 'loading' ? (
-                    <span className="flex items-center justify-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Регистрация...
-                    </span>
-                  ) : submitStatus === 'success' ? (
-                    <span className="flex items-center justify-center">
-                      <FaCheck className="mr-2" />
-                      Регистрация успешна!
-                    </span>
-                  ) : (
-                    "Зарегистрироваться"
-                  )}
-                </motion.button>
-                
-                {submitStatus === 'error' && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mt-4 p-3 bg-red-100 text-red-700 rounded-md text-sm flex items-start"
+                <motion.div variants={inputVariants}>
+                  <button
+                    type="submit"
+                    disabled={submitStatus === 'loading' || submitStatus === 'success'}
+                    className="btn-primary w-full py-3 flex items-center justify-center"
                   >
-                    <FaExclamationTriangle className="mr-2 mt-0.5" />
-                    <span>Пожалуйста, исправьте ошибки в форме и попробуйте снова.</span>
-                  </motion.div>
-                )}
+                    {submitStatus === 'loading' ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Регистрация...
+                      </>
+                    ) : submitStatus === 'success' ? (
+                      <>
+                        <FaCheck className="mr-2" />
+                        Зарегистрирован
+                      </>
+                    ) : (
+                      'Зарегистрироваться'
+                    )}
+                  </button>
+                </motion.div>
+                
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-gray-600">
+                    Уже есть аккаунт?{' '}
+                    <Link href="/login" className="text-primary-600 hover:text-primary-800 font-medium">
+                      Войти
+                    </Link>
+                  </p>
+                </div>
               </form>
-              
-              <motion.div variants={inputVariants} className="mt-6 text-center text-sm text-gray-600">
-                Уже есть аккаунт?{' '}
-                <Link href="/login" className="text-primary-600 hover:text-primary-800 font-medium">
-                  Войти
-                </Link>
-              </motion.div>
             </motion.div>
           </div>
         </div>

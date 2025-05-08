@@ -57,6 +57,38 @@ const mockTeams = [
     memberCount: 7,
     competitionCount: 5,
     image: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?q=80&w=2080'
+  },
+  {
+    id: 7,
+    name: 'Спортивный клуб "Олимп"',
+    description: 'Универсальный спортивный клуб для всех видов спорта',
+    memberCount: 20,
+    competitionCount: 14,
+    image: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=2070'
+  },
+  {
+    id: 8,
+    name: 'Шахматный клуб "Гамбит"',
+    description: 'Профессиональная шахматная команда',
+    memberCount: 6,
+    competitionCount: 11,
+    image: 'https://images.unsplash.com/photo-1580541832626-2a7131ee809f?q=80&w=2071'
+  },
+  {
+    id: 9,
+    name: 'Волейбольная команда "Высота"',
+    description: 'Университетская волейбольная команда',
+    memberCount: 14,
+    competitionCount: 6,
+    image: 'https://images.unsplash.com/photo-1574271143515-5cddf8da19be?q=80&w=2574'
+  },
+  {
+    id: 10,
+    name: 'Команда КВН "Смешарики"',
+    description: 'Веселая и находчивая команда юмористов',
+    memberCount: 8,
+    competitionCount: 4,
+    image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?q=80&w=2070'
   }
 ]
 
@@ -91,6 +123,30 @@ export default function TeamsPage() {
   
   useEffect(() => {
     setIsLoaded(true)
+    
+    // Загружаем команды из localStorage
+    try {
+      const storedTeams = localStorage.getItem('teams')
+      if (storedTeams) {
+        const parsedTeams = JSON.parse(storedTeams)
+        if (Array.isArray(parsedTeams) && parsedTeams.length > 0) {
+          // Объединяем сохраненные команды с мок-данными, исключая дубликаты по id
+          const combinedTeams = [...parsedTeams];
+          
+          // Добавляем только те мок-команды, id которых еще нет в сохраненных командах
+          const existingIds = new Set(parsedTeams.map(team => team.id));
+          mockTeams.forEach(team => {
+            if (!existingIds.has(team.id)) {
+              combinedTeams.push(team);
+            }
+          });
+          
+          setTeams(combinedTeams);
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка при загрузке команд из localStorage:', error)
+    }
   }, [])
 
   // Filter teams based on search query
@@ -149,8 +205,11 @@ export default function TeamsPage() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="mb-12 text-center"
           >
-            <Link href="/teams/create" className="btn-primary px-8 py-3">
+            <Link href="/teams/create" className="btn-primary px-8 py-3 mr-4">
               Создать новую команду
+            </Link>
+            <Link href="/competitions" className="btn-outline px-8 py-3">
+              <FaTrophy className="inline-block mr-2" /> Смотреть соревнования
             </Link>
           </motion.div>
           

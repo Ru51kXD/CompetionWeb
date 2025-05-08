@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import Navbar from '../../components/Navbar'
 import Footer from '../../components/Footer'
-import { FaCalendarAlt, FaMapMarkerAlt, FaClock, FaUsers, FaClipboardList, FaUserPlus } from 'react-icons/fa'
+import { FaCalendarAlt, FaMapMarkerAlt, FaClock, FaUsers, FaClipboardList, FaUserPlus, FaTrophy, FaArrowLeft, FaEdit, FaPlus, FaInfoCircle } from 'react-icons/fa'
+import { useAuth } from '../../context/AuthContext'
 
 // Mock data for competitions (same as on the listing page)
 const mockCompetitions = [
@@ -161,42 +163,200 @@ const formatTime = (date: Date) => {
   })
 }
 
-export default function CompetitionDetailPage({ params }: { params: { id: string } }) {
-  const id = parseInt(params.id)
-  const [competition, setCompetition] = useState<any>(null)
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [activeTab, setActiveTab] = useState('about')
+export default function CompetitionDetailPage() {
+  const params = useParams()
+  const id = params.id
+  const [competition, setCompetition] = useState(null)
+  const [participatingTeams, setParticipatingTeams] = useState([])
+  const [allTeams, setAllTeams] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [showTeamSelection, setShowTeamSelection] = useState(false)
+  const [selectedTeam, setSelectedTeam] = useState('')
+  const [registrationSuccess, setRegistrationSuccess] = useState(false)
+  const [registeredTeamName, setRegisteredTeamName] = useState('')
+  const { isAdmin } = useAuth()
 
   useEffect(() => {
-    // Find competition by ID
-    const found = mockCompetitions.find(comp => comp.id === id)
-    if (found) {
-      setCompetition(found)
+    const fetchCompetition = async () => {
+      setLoading(true)
+      try {
+        // Get competitions from localStorage
+        const storedCompetitions = localStorage.getItem('competitions')
+        const storedTeams = localStorage.getItem('teams')
+        
+        if (storedCompetitions) {
+          const allCompetitions = JSON.parse(storedCompetitions)
+          
+          // Find competition with matching id
+          const competitionId = typeof id === 'string' ? parseInt(id, 10) : id
+          const foundCompetition = allCompetitions.find(c => c.id === competitionId)
+          
+          if (foundCompetition) {
+            setCompetition(foundCompetition)
+            
+            // Get participating teams if any
+            if (storedTeams) {
+              const teams = JSON.parse(storedTeams)
+              setAllTeams(teams)
+              
+              // Filter participating teams
+              if (foundCompetition.teams && foundCompetition.teams.length > 0) {
+                const participatingTeams = teams.filter(team => 
+                  foundCompetition.teams.includes(team.id)
+                )
+                setParticipatingTeams(participatingTeams)
+              }
+            }
+          } else {
+            setError('Соревнование не найдено')
+          }
+        } else {
+          setError('Соревнования не найдены')
+        }
+      } catch (err) {
+        console.error('Ошибка при загрузке соревнования:', err)
+        setError('Ошибка при загрузке данных соревнования')
+      } finally {
+        setLoading(false)
+      }
     }
-    setIsLoaded(true)
+
+    if (id) {
+      fetchCompetition()
+    }
   }, [id])
 
-  if (!isLoaded) {
+  const handleAddTeam = () => {
+    if (!selectedTeam) return
+    
+    const teamId = parseInt(selectedTeam, 10)
+    const team = allTeams.find(t => t.id === teamId)
+    
+    if (team && competition) {
+      // Update competition in localStorage
+      try {
+        const storedCompetitions = localStorage.getItem('competitions')
+        if (storedCompetitions) {
+          const competitions = JSON.parse(storedCompetitions)
+          const competitionId = typeof id === 'string' ? parseInt(id, 10) : id
+          const competitionIndex = competitions.findIndex(c => c.id === competitionId)
+          
+          if (competitionIndex !== -1) {
+            // Add team to competition teams list
+            const updatedTeams = [...(competitions[competitionIndex].teams || []), teamId]
+            
+            // Update competition
+            competitions[competitionIndex] = {
+              ...competitions[competitionIndex],
+              teams: updatedTeams,
+              participantCount: updatedTeams.length
+            }
+            
+            // Save updated competitions back to localStorage
+            localStorage.setItem('competitions', JSON.stringify(competitions))
+            
+            // Update local state
+            setCompetition({
+              ...competition,
+              teams: updatedTeams,
+              participantCount: updatedTeams.length
+            })
+            
+            // Add team to local participating teams list
+            setParticipatingTeams([...participatingTeams, team])
+            
+            // Update team competition count
+            const storedTeams = localStorage.getItem('teams')
+            if (storedTeams) {
+              const teams = JSON.parse(storedTeams)
+              const teamIndex = teams.findIndex(t => t.id === teamId)
+              
+              if (teamIndex !== -1) {
+                teams[teamIndex] = {
+                  ...teams[teamIndex],
+                  competitionCount: (teams[teamIndex].competitionCount || 0) + 1
+                }
+                
+                localStorage.setItem('teams', JSON.stringify(teams))
+              }
+            }
+
+            // Show success message
+            setRegisteredTeamName(team.name)
+            setRegistrationSuccess(true)
+            
+            // Hide success message after 5 seconds
+            setTimeout(() => {
+              setRegistrationSuccess(false)
+            }, 5000)
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка при добавлении команды:', error)
+      }
+      
+      // Reset selection
+      setSelectedTeam('')
+      setShowTeamSelection(false)
+    }
+  }
+
+  // Get status badge styling
+  const getStatusBadge = (status) => {
+    switch(status) {
+      case 'upcoming':
+        return { 
+          label: 'Предстоит', 
+          classes: 'bg-blue-100 text-blue-700' 
+        }
+      case 'active':
+        return { 
+          label: 'Активно', 
+          classes: 'bg-green-100 text-green-700' 
+        }
+      case 'completed':
+        return { 
+          label: 'Завершено', 
+          classes: 'bg-gray-100 text-gray-700' 
+        }
+      default:
+        return { 
+          label: 'Неизвестно', 
+          classes: 'bg-gray-100 text-gray-700' 
+        }
+    }
+  }
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex justify-center items-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary-600"></div>
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary-500"></div>
+        </main>
+        <Footer />
       </div>
     )
   }
 
-  if (!competition) {
+  if (error || !competition) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-grow pt-24 pb-20">
           <div className="container mx-auto px-4 text-center">
-            <h1 className="text-4xl font-bold mb-4">Соревнование не найдено</h1>
-            <p className="text-xl text-gray-600 mb-8">
-              Запрашиваемое соревнование не существует или было удалено.
-            </p>
-            <Link href="/competitions" className="btn-primary">
-              Вернуться к списку соревнований
-            </Link>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <h1 className="text-3xl font-bold mb-4">{error || 'Соревнование не найдено'}</h1>
+              <p className="text-gray-600 mb-8">Возможно, соревнование было удалено или у вас нет доступа.</p>
+              <Link href="/competitions" className="btn-primary inline-flex items-center">
+                <FaArrowLeft className="mr-2" /> Вернуться к списку соревнований
+              </Link>
+            </motion.div>
           </div>
         </main>
         <Footer />
@@ -204,239 +364,360 @@ export default function CompetitionDetailPage({ params }: { params: { id: string
     )
   }
 
-  const typeLabels = {
-    'SPORTS': 'Спортивное',
-    'INTELLECTUAL': 'Интеллектуальное',
-    'CREATIVE': 'Творческое'
-  }
-
-  const typeColors = {
-    'SPORTS': 'bg-primary-100 text-primary-800',
-    'INTELLECTUAL': 'bg-secondary-100 text-secondary-800',
-    'CREATIVE': 'bg-accent-100 text-accent-800'
-  }
+  const statusBadge = getStatusBadge(competition.status)
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
       
       <main className="flex-grow pt-24 pb-20">
-        {/* Hero Section with Image */}
-        <div className="relative h-96 w-full">
-          <Image
-            src={competition.image}
-            alt={competition.title}
-            fill
-            className="object-cover brightness-50"
-            priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-          <div className="absolute bottom-0 left-0 right-0 p-8">
-            <div className="container mx-auto">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                <span className={`inline-block text-sm font-medium px-3 py-1 rounded-full mb-4 ${typeColors[competition.type]}`}>
-                  {typeLabels[competition.type]}
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-6"
+          >
+            <Link href="/competitions" className="inline-flex items-center text-primary-600 hover:text-primary-800 transition-colors">
+              <FaArrowLeft className="mr-2" /> Вернуться к списку соревнований
+            </Link>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6 }}
+            className="bg-white rounded-xl shadow-xl overflow-hidden"
+          >
+            {/* Hero section with competition image */}
+            <div className="relative h-64 md:h-80">
+              <Image
+                src={competition.image}
+                alt={competition.title}
+                fill
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+              <div className="absolute top-4 right-4">
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.classes}`}>
+                  {statusBadge.label}
                 </span>
-                <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">{competition.title}</h1>
-                <div className="flex flex-wrap gap-6 text-white text-sm md:text-base">
-                  <div className="flex items-center">
-                    <FaCalendarAlt className="mr-2 text-primary-400" />
-                    <span>{formatDate(competition.startDate)} - {formatDate(competition.endDate)}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <FaClock className="mr-2 text-primary-400" />
-                    <span>{formatTime(competition.startDate)}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <FaMapMarkerAlt className="mr-2 text-primary-400" />
-                    <span>{competition.location}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <FaUsers className="mr-2 text-primary-400" />
-                    <span>{competition.participants} / {competition.maxParticipants} участников</span>
-                  </div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+                <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{competition.title}</h1>
+                
+                {/* Action buttons */}
+                <div className="flex items-center gap-3 mt-4">
+                  <button 
+                    onClick={() => setShowTeamSelection(!showTeamSelection)}
+                    className="btn-primary px-5 py-2.5 text-base shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    <FaUserPlus className="mr-2" /> Зарегистрировать команду
+                  </button>
+                  {isAdmin() && (
+                    <Link href={`/competitions/${id}/edit`} className="btn-white-outline">
+                      <FaEdit className="mr-2" /> Редактировать
+                    </Link>
+                  )}
                 </div>
-              </motion.div>
+              </div>
             </div>
-          </div>
-        </div>
-        
-        {/* Content Section */}
-        <div className="container mx-auto px-4 py-12">
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Main Content */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="lg:w-2/3"
-            >
-              {/* Tabs */}
-              <div className="border-b border-gray-200 mb-8">
-                <nav className="flex space-x-8">
-                  <button
-                    onClick={() => setActiveTab('about')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'about' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                  >
-                    О соревновании
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('rules')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'rules' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                  >
-                    Правила
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('contact')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'contact' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                  >
-                    Контакты
-                  </button>
-                </nav>
-              </div>
-              
-              {/* Tab Content */}
-              <div className="prose max-w-none">
-                {activeTab === 'about' && (
-                  <div>
-                    <h2 className="text-2xl font-bold mb-4">Описание</h2>
-                    <p className="text-lg mb-6">{competition.description}</p>
-                    
-                    <h3 className="text-xl font-bold mb-3">Организатор</h3>
-                    <p className="mb-6">{competition.organizer}</p>
-                    
-                    <h3 className="text-xl font-bold mb-3">Детали проведения</h3>
-                    <ul className="space-y-2">
-                      <li className="flex items-start">
-                        <span className="font-semibold w-48">Дата начала:</span>
-                        <span>{formatDate(competition.startDate)}</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="font-semibold w-48">Дата окончания:</span>
-                        <span>{formatDate(competition.endDate)}</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="font-semibold w-48">Время начала:</span>
-                        <span>{formatTime(competition.startDate)}</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="font-semibold w-48">Место проведения:</span>
-                        <span>{competition.location}</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="font-semibold w-48">Тип соревнования:</span>
-                        <span>{typeLabels[competition.type]}</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="font-semibold w-48">Количество участников:</span>
-                        <span>{competition.participants} из {competition.maxParticipants}</span>
-                      </li>
-                    </ul>
-                  </div>
-                )}
-                
-                {activeTab === 'rules' && (
-                  <div>
-                    <h2 className="text-2xl font-bold mb-4">Правила соревнования</h2>
-                    <div className="whitespace-pre-line text-lg">
-                      {competition.rules}
-                    </div>
-                  </div>
-                )}
-                
-                {activeTab === 'contact' && (
-                  <div>
-                    <h2 className="text-2xl font-bold mb-4">Контактная информация</h2>
-                    <p className="text-lg mb-6">По всем вопросам, связанным с соревнованием, обращайтесь:</p>
-                    
-                    <div className="space-y-4">
-                      <div className="flex items-start">
-                        <span className="font-semibold w-48">Организатор:</span>
-                        <span>{competition.organizer}</span>
-                      </div>
-                      <div className="flex items-start">
-                        <span className="font-semibold w-48">Email:</span>
-                        <a href={`mailto:${competition.contactEmail}`} className="text-primary-600 hover:text-primary-800">
-                          {competition.contactEmail}
-                        </a>
-                      </div>
-                      <div className="flex items-start">
-                        <span className="font-semibold w-48">Телефон:</span>
-                        <a href={`tel:${competition.contactPhone}`} className="text-primary-600 hover:text-primary-800">
-                          {competition.contactPhone}
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
             
-            {/* Sidebar */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-              className="lg:w-1/3"
-            >
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-xl font-bold mb-6">Управление участием</h3>
-                
-                <div className="mb-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600">Занято мест:</span>
-                    <span className="font-semibold">{competition.participants} / {competition.maxParticipants}</span>
+            {/* Competition details */}
+            <div className="p-6 md:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="bg-gray-100 rounded-lg py-3 px-4">
+                  <div className="flex items-center mb-1">
+                    <FaCalendarAlt className="mr-2 text-primary-500" />
+                    <span className="font-medium">Даты проведения</span>
                   </div>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-primary-600" 
-                      style={{ width: `${(competition.participants / competition.maxParticipants) * 100}%` }}
-                    ></div>
-                  </div>
+                  <p className="ml-6 text-gray-600">
+                    {formatDate(competition.startDate)} - {formatDate(competition.endDate)}
+                  </p>
                 </div>
                 
-                <button className="btn-primary w-full mb-4 flex items-center justify-center">
-                  <FaUserPlus className="mr-2" />
-                  Подать заявку на участие
-                </button>
+                <div className="bg-gray-100 rounded-lg py-3 px-4">
+                  <div className="flex items-center mb-1">
+                    <FaMapMarkerAlt className="mr-2 text-primary-500" />
+                    <span className="font-medium">Место проведения</span>
+                  </div>
+                  <p className="ml-6 text-gray-600">{competition.location}</p>
+                </div>
                 
-                <button className="btn-outline w-full flex items-center justify-center">
-                  <FaClipboardList className="mr-2" />
-                  Скачать правила
-                </button>
+                <div className="bg-gray-100 rounded-lg py-3 px-4">
+                  <div className="flex items-center mb-1">
+                    <FaUsers className="mr-2 text-primary-500" />
+                    <span className="font-medium">Количество команд</span>
+                  </div>
+                  <p className="ml-6 text-gray-600">{competition.participantCount || 0}</p>
+                </div>
               </div>
               
-              <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
-                <h3 className="text-xl font-bold mb-4">Поделиться</h3>
-                <div className="flex space-x-4">
-                  <button className="p-3 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd"></path>
-                    </svg>
-                  </button>
-                  <button className="p-3 rounded-full bg-blue-400 text-white hover:bg-blue-500 transition-colors">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84"></path>
-                    </svg>
-                  </button>
-                  <button className="p-3 rounded-full bg-green-600 text-white hover:bg-green-700 transition-colors">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path fillRule="evenodd" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"></path>
-                    </svg>
-                  </button>
-                  <button className="p-3 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path fillRule="evenodd" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13.5h-1v6h1V15h2v-1h-2V6.5z" clipRule="evenodd"></path>
-                    </svg>
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-3">О соревновании</h2>
+                <p className="text-gray-600 leading-relaxed">{competition.description}</p>
+              </div>
+              
+              {competition.status !== 'completed' && (
+                <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-700">
+                  <div className="flex items-center mb-2">
+                    <FaInfoCircle className="mr-2" />
+                    <h3 className="font-medium">Регистрация команд открыта</h3>
+                  </div>
+                  <p>Зарегистрируйте свою команду для участия в этом соревновании! Нажмите кнопку "Зарегистрировать команду" вверху страницы.</p>
+                </div>
+              )}
+              
+              {/* Participating Teams */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-xl font-semibold">Команды-участники</h2>
+                  <button 
+                    onClick={() => setShowTeamSelection(!showTeamSelection)}
+                    className="inline-flex items-center text-sm text-primary-600 hover:text-primary-800"
+                  >
+                    <FaPlus className="mr-1" /> Добавить команду
                   </button>
                 </div>
+                
+                {registrationSuccess && (
+                  <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 flex items-center">
+                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Команда "{registeredTeamName}" успешно зарегистрирована!
+                  </div>
+                )}
+                
+                {showTeamSelection && (
+                  <div className="mb-4 bg-gray-50 p-6 rounded-lg shadow-md border border-gray-200">
+                    <h3 className="text-lg font-medium mb-3">Регистрация команды на соревнование</h3>
+                    <p className="text-gray-600 mb-4">Выберите свою команду для участия в соревновании "{competition.title}"</p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <select 
+                        className="input flex-grow"
+                        value={selectedTeam}
+                        onChange={(e) => setSelectedTeam(e.target.value)}
+                      >
+                        <option value="">Выберите команду</option>
+                        {allTeams
+                          .filter(team => !participatingTeams.some(pt => pt.id === team.id))
+                          .map(team => (
+                            <option key={team.id} value={team.id}>
+                              {team.name}
+                            </option>
+                          ))
+                        }
+                      </select>
+                      <button 
+                        onClick={handleAddTeam}
+                        className="btn-primary"
+                        disabled={!selectedTeam}
+                      >
+                        Зарегистрировать команду
+                      </button>
+                      <button 
+                        onClick={() => setShowTeamSelection(false)}
+                        className="btn-outline"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                    <div className="mt-3 text-sm text-gray-500">
+                      Не нашли свою команду? <Link href="/teams/create" className="text-primary-600 hover:text-primary-800">Создайте новую команду</Link>
+                    </div>
+                  </div>
+                )}
+                
+                {participatingTeams.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {participatingTeams.map(team => (
+                      <div key={team.id} className="flex items-center p-3 border border-gray-200 rounded-lg">
+                        <div className="w-12 h-12 relative rounded-full overflow-hidden mr-4">
+                          <Image 
+                            src={team.image} 
+                            alt={team.name} 
+                            fill 
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="flex-grow">
+                          <h3 className="font-medium">{team.name}</h3>
+                          <p className="text-sm text-gray-500">{team.memberCount} участников</p>
+                        </div>
+                        <Link 
+                          href={`/teams/${team.id}`}
+                          className="text-sm text-primary-600 hover:text-primary-800"
+                        >
+                          Подробнее
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-lg p-4 text-center text-gray-500">
+                    В этом соревновании пока нет участвующих команд
+                  </div>
+                )}
               </div>
-            </motion.div>
-          </div>
+              
+              {/* Results section */}
+              <div>
+                <h2 className="text-xl font-semibold mb-3">Результаты</h2>
+                {competition.status === 'completed' ? (
+                  competition.results ? (
+                    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Место
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Команда
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Очки
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Результат
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {competition.results.map((result, index) => {
+                            const team = allTeams.find(t => t.id === result.teamId);
+                            let badgeClass = "";
+                            
+                            if (index === 0) badgeClass = "bg-amber-100 text-amber-800"; // Gold
+                            else if (index === 1) badgeClass = "bg-gray-200 text-gray-800"; // Silver
+                            else if (index === 2) badgeClass = "bg-amber-50 text-amber-700"; // Bronze
+                            
+                            return (
+                              <tr key={result.teamId} className={index < 3 ? "bg-opacity-50" : ""}>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${badgeClass}`}>
+                                      {index + 1}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div className="flex-shrink-0 h-10 w-10 relative">
+                                      <Image
+                                        src={team?.image || "https://via.placeholder.com/40"}
+                                        alt=""
+                                        fill
+                                        className="rounded-full object-cover"
+                                      />
+                                    </div>
+                                    <div className="ml-4">
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {team?.name || "Команда"}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 font-medium">{result.points}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    index < 3 ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                                  }`}>
+                                    {index < 3 ? "Призёр" : "Участник"}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded-lg p-4 text-center text-gray-500">
+                      Результаты соревнования пока не опубликованы
+                    </div>
+                  )
+                ) : (
+                  <div className="bg-gray-50 rounded-lg p-4 text-center text-gray-500">
+                    Результаты будут доступны после завершения соревнования
+                  </div>
+                )}
+              </div>
+              
+              {/* Schedule section */}
+              {competition.status !== 'completed' && (
+                <div className="mt-8">
+                  <h2 className="text-xl font-semibold mb-3">Расписание</h2>
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Дата
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Время
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Событие
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        <tr>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(competition.startDate)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            10:00
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            Открытие соревнования
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(competition.startDate)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            11:00
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            Начало первого этапа
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(competition.endDate)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            15:00
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            Финальный этап
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(competition.endDate)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            17:00
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            Награждение победителей
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
         </div>
       </main>
       
