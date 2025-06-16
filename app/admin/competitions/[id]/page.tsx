@@ -157,7 +157,7 @@ export default function AdminCompetitionDetailsPage() {
             status: 'upcoming',
             startDate: new Date(Date.now() + 86400000).toISOString(), // завтра
             endDate: new Date(Date.now() + 86400000 * 7).toISOString(), // через неделю
-            location: 'Москва, Россия',
+            location: 'Алматы, Казахстан',
             participantCount: 0,
             maxTeams: 10,
             maxTeamSize: 5,

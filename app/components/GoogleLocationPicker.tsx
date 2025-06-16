@@ -26,7 +26,7 @@ interface GoogleLocationPickerProps {
 
 const GoogleLocationPicker: React.FC<GoogleLocationPickerProps> = memo(({
   initialAddress = '',
-  initialCoordinates = [37.6156, 55.7522], // Москва по умолчанию
+  initialCoordinates = [76.9277, 43.2220], // Алматы по умолчанию
   onLocationChange
 }) => {
   const [markerPosition, setMarkerPosition] = useState({

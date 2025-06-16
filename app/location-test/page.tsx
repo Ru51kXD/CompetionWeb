@@ -50,7 +50,7 @@ export default function LocationTestPage() {
             
             <GoogleLocationPicker 
               onLocationChange={handleLocationChange}
-              initialCoordinates={[37.6156, 55.7522]} // Москва
+              initialCoordinates={[76.9277, 43.2220]} // Алматы
             />
             
             <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-md">

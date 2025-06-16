@@ -41,7 +41,7 @@ interface LocationPickerProps {
 
 export default function LocationPicker({
   initialAddress = '',
-  initialCoordinates = [37.6156, 55.7522], // Москва по умолчанию
+  initialCoordinates = [76.9277, 43.2220], // Алматы по умолчанию
   onLocationChange
 }: LocationPickerProps) {
   // Load Mapbox GL JS script if needed

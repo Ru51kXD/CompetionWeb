@@ -11,7 +11,7 @@ mapboxgl.accessToken = 'pk.eyJ1IjoiZXhhbXBsZXVzZXIiLCJhIjoiY2xyLTM3ZTltLWx2ZWQiO
 export default function CompetitionsMap() {
   const mapContainer = useRef(null);
   const map = useRef(null);
-  const [lng, setLng] = useState(37.6173); // Москва
+  const [lng, setLng] = useState(76.9277); // Алматы
   const [lat, setLat] = useState(55.7558);
   const [zoom, setZoom] = useState(10);
   const [competitionLocations, setCompetitionLocations] = useState([]);
@@ -26,8 +26,8 @@ export default function CompetitionsMap() {
         name: 'Чемпионат по программированию 2023',
         location: {
           name: 'Цифровой деловой центр',
-          address: 'ул. Пушкина, 10, Москва',
-          coordinates: [37.6173, 55.7558]
+          address: 'ул. Толе би, 59, Алматы',
+          coordinates: [76.9277, 55.7558]
         },
         date: '2023-11-15',
         participants: 42,
@@ -40,8 +40,8 @@ export default function CompetitionsMap() {
         name: 'Хакатон Web Development',
         location: {
           name: 'Технопарк "Инновация"',
-          address: 'Ленинградский пр., 80, Москва',
-          coordinates: [37.5373, 55.8048]
+          address: 'пр. Абая, 150, Алматы',
+          coordinates: [76.9373, 55.8048]
         },
         date: '2023-12-20',
         participants: 36,
@@ -54,8 +54,8 @@ export default function CompetitionsMap() {
         name: 'AI Challenge Spring 2024',
         location: {
           name: 'Бизнес-центр "Горизонт"',
-          address: 'ул. Тверская, 22, Москва',
-          coordinates: [37.6014, 55.7648]
+          address: 'ул. Гоголя, 40, Алматы',
+          coordinates: [76.9014, 55.7648]
         },
         date: '2024-03-10',
         participants: 28,
@@ -68,8 +68,8 @@ export default function CompetitionsMap() {
         name: 'Киберспортивный турнир',
         location: {
           name: 'Центр киберспорта "Арена"',
-          address: 'ул. Новый Арбат, 15, Москва',
-          coordinates: [37.5914, 55.7528]
+          address: 'пр. Достык, 52, Алматы',
+          coordinates: [76.9114, 55.7528]
         },
         date: '2024-01-15',
         participants: 64,

@@ -20,7 +20,7 @@ export default function CompetitionsMapPage() {
   const [popupInfo, setPopupInfo] = useState(null)
   const [viewport, setViewport] = useState({
     latitude: 55.7522,
-    longitude: 37.6156, // Москва по умолчанию
+    longitude: 76.9277, // Алматы по умолчанию
     zoom: 5
   })
   const [filter, setFilter] = useState({

@@ -37,7 +37,7 @@ export default function UserProfile({ params }) {
         avatar: null, // URL аватара
         role: 'user',
         joinDate: '2023-01-15',
-        location: 'Москва, Россия',
+        location: 'Алматы, Казахстан',
         skills: ['JavaScript', 'React', 'Node.js', 'Python', 'Data Science'],
         bio: 'Разработчик с 5-летним опытом в веб-разработке. Увлекаюсь алгоритмами и участвую в соревнованиях по программированию с 2020 года.',
         social: {

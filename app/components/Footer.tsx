@@ -172,13 +172,13 @@ export default function Footer() {
                 <li className="flex items-start">
                   <FaMapMarkerAlt className="text-primary-500 mr-3 mt-1" />
                   <span className="text-gray-400">
-                    123456, Россия, г. Москва, ул. Примерная, д. 123
+                    050000, Казахстан, г. Алматы, ул. Примерная, д. 123
                   </span>
                 </li>
                 <li className="flex items-center">
                   <FaPhone className="text-primary-500 mr-3" />
-                  <Link href="tel:+71234567890" className="text-gray-400 hover:text-white transition-colors">
-                    +7 (123) 456-78-90
+                  <Link href="tel:+77271234567" className="text-gray-400 hover:text-white transition-colors">
+                    +7 (727) 123-45-67
                   </Link>
                 </li>
                 <li className="flex items-center">

@@ -32,7 +32,7 @@ export default function CreateCompetitionPage() {
     status: 'upcoming',
     maxTeams: 10, // Maximum number of teams that can participate
     maxTeamSize: 10, // Maximum number of members per team
-    coordinates: [37.6156, 55.7522] as [number, number], // Москва по умолчанию
+    coordinates: [76.9277, 43.2220] as [number, number], // Алматы по умолчанию
     city: '',
     country: '',
     competitionType: 'team', // Default to team competition
