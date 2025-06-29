@@ -73,6 +73,7 @@ interface Competition {
 
 export default function AdminCompetitionDetailsPage() {
   const params = useParams();
+  if (!params || !params.id) return null;
   const competitionId = params.id as string;
   const router = useRouter();
   const [competition, setCompetition] = useState<Competition | null>(null);

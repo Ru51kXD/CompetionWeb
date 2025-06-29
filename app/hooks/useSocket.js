@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import io from 'socket.io-client';
 
-export default function useSocket() {
+function useSocket() {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -83,4 +83,7 @@ export default function useSocket() {
     updateResults,
     sendNotification
   };
-} 
+}
+
+export { useSocket };
+export default useSocket; 

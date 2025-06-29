@@ -10,7 +10,7 @@ import {
   FaUsers, 
   FaCalendarAlt, 
   FaChartLine,
-  FaBadgeCheck,
+  FaCheckCircle,
   FaCode,
   FaGraduationCap,
   FaBrain,
@@ -218,7 +218,7 @@ export default function UserProfile({ params }) {
       case 'star':
         return <FaStar className="text-yellow-500" />;
       case 'badge':
-        return <FaBadgeCheck className="text-blue-500" />;
+        return <FaCheckCircle className="text-blue-500" />;
       case 'code':
         return <FaCode className="text-purple-500" />;
       case 'users':

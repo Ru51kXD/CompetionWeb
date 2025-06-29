@@ -3,7 +3,7 @@
 import { useState, lazy, Suspense } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { useSocket } from '../hooks/useSocket';
+import useSocket from '../hooks/useSocket';
 import { motion } from 'framer-motion';
 import { 
   FaTrophy, 
