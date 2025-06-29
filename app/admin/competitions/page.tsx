@@ -6,13 +6,25 @@ import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { FaPlus, FaEdit, FaTrash, FaSearch, FaTrophy, FaFilter, FaCalendarAlt, FaMapMarkerAlt } from 'react-icons/fa'
 
+interface Competition {
+  id: number;
+  title: string;
+  description: string;
+  status: 'upcoming' | 'active' | 'completed';
+  startDate: string;
+  endDate: string;
+  location: string;
+  image?: string;
+  participantCount?: number;
+}
+
 export default function AdminCompetitionsPage() {
-  const [competitions, setCompetitions] = useState([])
+  const [competitions, setCompetitions] = useState<Competition[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [competitionToDelete, setCompetitionToDelete] = useState(null)
+  const [competitionToDelete, setCompetitionToDelete] = useState<Competition | null>(null)
 
   useEffect(() => {
     fetchCompetitions()
@@ -35,7 +47,7 @@ export default function AdminCompetitionsPage() {
     }
   }
 
-  const handleDeleteClick = (competition) => {
+  const handleDeleteClick = (competition: Competition) => {
     setCompetitionToDelete(competition)
     setShowDeleteModal(true)
   }
@@ -54,7 +66,7 @@ export default function AdminCompetitionsPage() {
     }
   }
 
-  const filteredCompetitions = competitions.filter(competition => {
+  const filteredCompetitions = competitions.filter((competition: Competition) => {
     const matchesQuery = (
       competition.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       competition.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -67,7 +79,7 @@ export default function AdminCompetitionsPage() {
   })
 
   // Format date
-  const formatDate = (date) => {
+  const formatDate = (date: string) => {
     if (!date) return '';
     return new Date(date).toLocaleDateString('ru-RU', {
       day: 'numeric',
