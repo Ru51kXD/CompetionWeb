@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Form, Input, Button, DatePicker, Select, Card, message, InputNumber, Upload, Textarea } from 'antd';
+import { Form, Input, Button, DatePicker, Select, Card, message, InputNumber, Upload } from 'antd';
 import { ArrowLeftOutlined, UploadOutlined } from '@ant-design/icons';
 
 const { Option } = Select;

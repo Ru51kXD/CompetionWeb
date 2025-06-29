@@ -9,6 +9,9 @@
 - ✅ Исправлена проверка `params` в `app/admin/competitions/[id]/page.tsx`
 - ✅ Обновлена конфигурация TypeScript в `tsconfig.json`
 - ✅ Создан `vercel.json` для правильной конфигурации деплоя
+- ✅ Исправлен импорт `Textarea` в `app/admin/competitions/create/page.tsx` (удален из импорта antd)
+- ✅ Удален устаревший пакет `dnd-kit@0.0.2` из зависимостей
+- ✅ Обновлен `.gitignore` для исключения `.next` директории
 
 ### 2. Переменные окружения
 
